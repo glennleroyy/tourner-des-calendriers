@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendrier Pompiers Bretagne</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Font Awesome pour les icônes -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* RESET */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        body {
+            background-color: #f0f0f0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* HEADER */
+        .header {
+            background: linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%);
+            color: white;
+            padding: 12px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+            position: relative;
+            z-index: 100;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .logo i {
+            font-size: 24px;
+        }
+        
+        .logo h1 {
+            font-size: 18px;
+        }
+        
+        .user-section {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        /* BOUTONS */
+        button {
+            background-color: #ff9800;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: background-color 0.3s;
+            font-size: 14px;
+        }
+        
+        button:hover {
+            background-color: #f57c00;
+        }
+        
+        .btn-logout {
+            background-color: #555;
+        }
+        
+        .btn-logout:hover {
+            background-color: #333;
+        }
+        
+        .btn-reset {
+            background-color: #f44336;
+        }
+        
+        .btn-reset:hover {
+            background-color: #d32f2f;
+        }
+        
+        /* MENU MOBILE */
+        .menu-toggle {
+            display: none;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+        }
+        
+        /* CONTENU PRINCIPAL */
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        /* CARTE */
+        #map {
+            flex: 1;
+            height: calc(100vh - 60px);
+            z-index: 1;
+        }
+        
+        /* SIDEBAR */
+        .sidebar {
+            width: 350px;
+            background-color: white;
+            padding: 15px;
+            overflow-y: auto;
+            box-shadow: -3px 0 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            transition: transform 0.3s ease;
+        }
+        
+        /* SECTION */
+        .section {
+            background-color: #f9f9f9;
+            border-radius: 10px;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+        }
+        
+        .section h3 {
+            color: #d32f2f;
+            margin-bottom: 15px;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #d32f2f;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        /* STATISTIQUES */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+        
+        .stat-item {
+            background-color: white;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #ddd;
+        }
+        
+        .stat-number {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .stat-label {
+            font-size: 11px;
+            color: #666;
+            margin-top: 3px;
+        }
+        
+        /* CLASSEMENT */
+        .ranking-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .ranking-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 10px;
+            border-bottom: 1px solid #eee;
+            background-color: white;
+            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+        
+        .ranking-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        
+        .rank {
+            font-weight: bold;
+            color: #d32f2f;
+            min-width: 25px;
+        }
+        
+        .rank-1 { color: #FFD700; }
+        .rank-2 { color: #C0C0C0; }
+        .rank-3 { color: #CD7F32; }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+        }
+        
+        .user-avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background-color: #d32f2f;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        .user-name {
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        .user-score {
+            font-weight: bold;
+            color: #333;
+            min-width: 40px;
+            text-align: right;
+        }
+        
+        /* LÉGENDE */
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .color-box {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            margin-right: 10px;
+            border: 2px solid white;
+            box-shadow: 0 0 5px rgba(0,0,0,0.2);
+        }
+        
+        /* POPUP */
+        .popup-content {
+            padding: 10px;
+            min-width: 250px;
+        }
+        
+        .popup-address {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #333;
+            font-size: 14px;
+        }
+        
+        .popup-note {
+            font-style: italic;
+            background-color: #f5f5f5;
+            padding: 6px;
+            border-radius: 5px;
+            margin-bottom: 12px;
+            font-size: 13px;
+        }
+        
+        .status-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+        
+        .status-btn {
+            padding: 8px 5px;
+            border: none;
+            border-radius: 4px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 12px;
+            transition: transform 0.2s;
+        }
+        
+        .status-btn:hover {
+            transform: scale(1.05);
+        }
+        
+        .popup-actions {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+        
+        .btn-delete {
+            background-color: #f44336;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .btn-delete:hover {
+            background-color: #d32f2f;
+        }
+        
+        .btn-edit {
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .btn-edit:hover {
+            background-color: #1976D2;
+        }
+        
+        /* ÉCRAN DE CONNEXION */
+        .login-screen {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: linear-gradient(135deg, #1a237e 0%, #283593 100%);
+            padding: 20px;
+        }
+        
+        .login-box {
+            background-color: white;
+            padding: 25px;
+            border-radius: 10px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        
+        .login-box h2 {
+            text-align: center;
+            color: #d32f2f;
+            margin-bottom: 20px;
+            font-size: 22px;
+        }
+        
+        .input-group {
+            margin-bottom: 15px;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        
+        .input-group input:focus {
+            outline: none;
+            border-color: #d32f2f;
+        }
+        
+        .login-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .btn-login {
+            background-color: #d32f2f;
+            width: 100%;
+            justify-content: center;
+            padding: 12px;
+        }
+        
+        .btn-signup {
+            background-color: #555;
+            width: 100%;
+            justify-content: center;
+            padding: 12px;
+        }
+        
+        .error-message {
+            color: #f44336;
+            text-align: center;
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #ffebee;
+            border-radius: 5px;
+            display: none;
+            font-size: 14px;
+        }
+        
+        /* ÉDITEUR DE NOTE */
+        .note-editor {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 1000;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        
+        .note-editor h3 {
+            margin-bottom: 15px;
+            color: #d32f2f;
+        }
+        
+        .note-editor textarea {
+            width: 100%;
+            height: 120px;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+        
+        .note-editor textarea:focus {
+            outline: none;
+            border-color: #d32f2f;
+        }
+        
+        .note-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        
+        /* LOADER */
+        .loader {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 9999;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 6px solid rgba(211, 47, 47, 0.3);
+            border-top: 6px solid #d32f2f;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* RESPONSIVE - MOBILE */
+        @media (max-width: 768px) {
+            .header {
+                padding: 10px;
+            }
+            
+            .logo h1 {
+                font-size: 16px;
+            }
+            
+            .menu-toggle {
+                display: block;
+            }
+            
+            .user-section {
+                display: none;
+            }
+            
+            .user-section.mobile-visible {
+                display: flex;
+                flex-direction: column;
+                position: absolute;
+                top: 100%;
+                right: 0;
+                background-color: #d32f2f;
+                padding: 15px;
+                border-radius: 0 0 0 10px;
+                box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+                z-index: 101;
+            }
+            
+            .container {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                position: fixed;
+                right: 0;
+                top: 60px;
+                bottom: 0;
+                width: 100%;
+                max-width: 320px;
+                transform: translateX(100%);
+                z-index: 99;
+            }
+            
+            .sidebar.active {
+                transform: translateX(0);
+            }
+            
+            #map {
+                height: calc(100vh - 60px);
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .stat-number {
+                font-size: 18px;
+            }
+            
+            button {
+                padding: 6px 10px;
+                font-size: 13px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .login-box {
+                padding: 20px;
+            }
+            
+            .login-box h2 {
+                font-size: 20px;
+            }
+            
+            .sidebar {
+                max-width: 280px;
+            }
+            
+            .section {
+                padding: 12px;
+            }
+            
+            .section h3 {
+                font-size: 15px;
+            }
+            
+            .popup-content {
+                min-width: 220px;
+            }
+        }
+        
+        /* SCROLLBAR */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #d32f2f;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #b71c1c;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ÉCRAN DE CONNEXION -->
+<div id="loginScreen" class="login-screen">
+    <div class="login-box">
+        <h2><i class="fas fa-fire-extinguisher"></i> Pompiers Bretagne</h2>
+        <p style="text-align: center; color: #666; margin-bottom: 20px; font-size: 14px;">
+            Gestion des tournées du calendrier
+        </p>
+        
+        <div class="input-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" placeholder="votre@email.com">
+        </div>
+        
+        <div class="input-group">
+            <label for="pseudo">Pseudo (visible par tous)</label>
+            <input type="text" id="pseudo" placeholder="Votre pseudo">
+        </div>
+        
+        <div class="input-group">
+            <label for="password">Mot de passe</label>
+            <input type="password" id="password" placeholder="Votre mot de passe">
+        </div>
+        
+        <div class="login-buttons">
+            <button id="btnLogin" class="btn-login">
+                <i class="fas fa-sign-in-alt"></i> Se connecter
+            </button>
+            <button id="btnSignup" class="btn-signup">
+                <i class="fas fa-user-plus"></i> Créer un compte
+            </button>
+        </div>
+        
+        <div id="errorMessage" class="error-message"></div>
+        
+        <p style="text-align: center; margin-top: 15px; color: #888; font-size: 12px;">
+            
+        </p>
+    </div>
+</div>
+
+<!-- APPLICATION PRINCIPALE -->
+<div id="app" style="display: none;">
+    <!-- HEADER -->
+    <div class="header">
+        <button class="menu-toggle" id="menuToggle">
+            <i class="fas fa-bars"></i>
+        </button>
+        
+        <div class="logo">
+            <i class="fas fa-fire-extinguisher"></i>
+            <h1>Calendrier Pompiers</h1>
+        </div>
+        
+        <button class="menu-toggle" id="userToggle">
+            <i class="fas fa-user"></i>
+        </button>
+        
+        <div class="user-section" id="userSection">
+            <span id="userPseudo"></span>
+            <button id="btnLogout" class="btn-logout">
+                <i class="fas fa-sign-out-alt"></i> Déconnexion
+            </button>
+            <button id="btnReset" class="btn-reset" style="display: none;">
+                <i class="fas fa-trash"></i> Reset
+            </button>
+        </div>
+    </div>
+    
+    <!-- CONTENU PRINCIPAL -->
+    <div class="container">
+        <!-- CARTE -->
+        <div id="map"></div>
+        
+        <!-- SIDEBAR -->
+        <div class="sidebar" id="sidebar">
+            <!-- STATISTIQUES PERSONNELLES -->
+            <div class="section">
+                <h3><i class="fas fa-chart-bar"></i> Mes Statistiques</h3>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-number" id="statTotal">0</div>
+                        <div class="stat-label">Total maisons</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="statBought">0</div>
+                        <div class="stat-label">Achetés</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="statNotBought">0</div>
+                        <div class="stat-label">Non achetés</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="statAbsent">0</div>
+                        <div class="stat-label">Absents</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- CLASSEMENT -->
+            <div class="section">
+                <h3><i class="fas fa-trophy"></i> Classement</h3>
+                <div class="ranking-list" id="rankingList">
+                    <!-- Les scores seront ajoutés ici dynamiquement -->
+                    <div class="ranking-item">
+                        <span class="rank rank-1">1</span>
+                        <div class="user-info">
+                            <div class="user-avatar">JD</div>
+                            <span class="user-name">Jean Dupont</span>
+                        </div>
+                        <span class="user-score">42 pts</span>
+                    </div>
+                    <!-- Plus d'items seront ajoutés dynamiquement -->
+                </div>
+            </div>
+            
+            <!-- LÉGENDE -->
+            <div class="section">
+                <h3><i class="fas fa-key"></i> Légende</h3>
+                <div class="legend-item">
+                    <div class="color-box" style="background-color: #9E9E9E;"></div>
+                    <span>Non passé</span>
+                </div>
+                <div class="legend-item">
+                    <div class="color-box" style="background-color: #4CAF50;"></div>
+                    <span>Acheté</span>
+                </div>
+                <div class="legend-item">
+                    <div class="color-box" style="background-color: #FF5722;"></div>
+                    <span>Non acheté</span>
+                </div>
+                <div class="legend-item">
+                    <div class="color-box" style="background-color: #2196F3;"></div>
+                    <span>Absent</span>
+                </div>
+            </div>
+            
+            <!-- INSTRUCTIONS -->
+            <div class="section">
+                <h3><i class="fas fa-info-circle"></i> Instructions</h3>
+                <p style="font-size: 13px; line-height: 1.4; color: #555;">
+                    1. <strong>Cliquez sur la carte</strong> pour ajouter une maison<br>
+                    2. <strong>Cliquez sur un point</strong> pour changer le statut<br>
+                    3. <strong>Supprimer un point</strong> : bouton dans le popup<br>
+                    4. <strong>Classement</strong> : 10pts acheté, 5pts absent, 1pt non acheté<br>
+                    5. <strong>RESET</strong> : admin seulement
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ÉDITEUR DE NOTE -->
+<div id="noteEditor" class="note-editor">
+    <h3>Modifier la note</h3>
+    <textarea id="noteText" placeholder="Ex: Repasser après 18h, 2ème étage, chien méchant..."></textarea>
+    <div class="note-buttons">
+        <button id="btnCancelNote" style="background-color: #777;">Annuler</button>
+        <button id="btnSaveNote" style="background-color: #d32f2f;">Enregistrer</button>
+    </div>
+</div>
+
+<!-- LOADER -->
+<div id="loader" class="loader">
+    <div class="spinner"></div>
+</div>
+
+<!-- SCRIPT -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+// ============================================
+// CONFIGURATION
+// ============================================
+
+// Variables globales
+let map;
+let markers = new Map();
+let currentUser = null;
+let editingMarkerId = null;
+
+// Adresse email de l'admin (VOUS - objectifcup@gmail.com)
+const ADMIN_EMAIL = "objectifcup@gmail.com";
+
+// Données de test (stockage local)
+let houses = JSON.parse(localStorage.getItem('pompiers_houses')) || [];
+let users = JSON.parse(localStorage.getItem('pompiers_users')) || [];
+
+// Système de points
+const POINTS = {
+    'acheté': 10,     // 10 points pour un calendrier acheté
+    'absent': 5,      // 5 points pour avoir trouvé quelqu'un absent
+    'non_acheté': 1,  // 1 point pour avoir tenté
+    'non_passé': 0    // 0 point pour non passé
+};
+
+// Statuts
+const STATUS = {
+    NOT_PASSED: 'non_passé',
+    BOUGHT: 'acheté',
+    NOT_BOUGHT: 'non_acheté',
+    ABSENT: 'absent'
+};
+
+// Couleurs pour chaque statut
+const STATUS_COLORS = {
+    'non_passé': '#9E9E9E',
+    'acheté': '#4CAF50',
+    'non_acheté': '#FF5722',
+    'absent': '#2196F3'
+};
+
+// Icônes Leaflet
+const STATUS_ICONS = {};
+for (const [status, color] of Object.entries(STATUS_COLORS)) {
+    STATUS_ICONS[status] = L.divIcon({
+        html: `<div style="background-color: ${color}; width: 25px; height: 25px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3);"></div>`,
+        iconSize: [25, 25],
+        iconAnchor: [12, 12]
+    });
+}
+
+// ============================================
+// FONCTIONS UTILITAIRES
+// ============================================
+
+function getInitials(name) {
+    return name.split(' ').map(word => word[0]).join('').toUpperCase().substring(0, 2);
+}
+
+function calculateUserScore(email) {
+    const userHouses = houses.filter(house => house.createdBy === email);
+    return userHouses.reduce((total, house) => total + (POINTS[house.status] || 0), 0);
+}
+
+function calculateAllScores() {
+    const scores = {};
+    
+    // Pour chaque utilisateur enregistré
+    users.forEach(user => {
+        scores[user.email] = {
+            pseudo: user.pseudo,
+            score: calculateUserScore(user.email),
+            email: user.email
+        };
+    });
+    
+    // Trier par score décroissant
+    return Object.values(scores).sort((a, b) => b.score - a.score);
+}
+
+function updateRanking() {
+    const scores = calculateAllScores();
+    const rankingList = document.getElementById('rankingList');
+    
+    if (scores.length === 0) {
+        rankingList.innerHTML = '<div style="text-align: center; color: #888; padding: 20px;">Aucun score disponible</div>';
+        return;
+    }
+    
+    let html = '';
+    scores.forEach((user, index) => {
+        const rankClass = `rank rank-${index + 1}`;
+        const initials = getInitials(user.pseudo);
+        
+        html += `
+            <div class="ranking-item">
+                <span class="${rankClass}">${index + 1}</span>
+                <div class="user-info">
+                    <div class="user-avatar" style="background-color: ${index === 0 ? '#FFD700' : index === 1 ? '#C0C0C0' : index === 2 ? '#CD7F32' : '#d32f2f'}">
+                        ${initials}
+                    </div>
+                    <span class="user-name">${user.pseudo}</span>
+                </div>
+                <span class="user-score">${user.score} pts</span>
+            </div>
+        `;
+    });
+    
+    rankingList.innerHTML = html;
+}
+
+// ============================================
+// INITIALISATION DE LA CARTE
+// ============================================
+
+function initMap() {
+    console.log("🗺️ Initialisation de la carte de Bretagne...");
+    
+    // Centrer sur la Bretagne
+    map = L.map('map').setView([48.2020, -2.9326], 9);
+    
+    // Ajouter les tuiles OpenStreetMap
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap',
+        maxZoom: 18,
+        minZoom: 8
+    }).addTo(map);
+    
+    // Définir les limites pour la Bretagne
+    const bounds = L.latLngBounds(
+        [47.0, -5.0], // Sud-ouest
+        [49.0, -1.0]  // Nord-est
+    );
+    map.setMaxBounds(bounds);
+    
+    // Gérer le clic sur la carte
+    map.on('click', function(e) {
+        if (!currentUser) return;
+        
+        console.log("📍 Clic sur la carte à:", e.latlng.lat, e.latlng.lng);
+        addHouse(e.latlng.lat, e.latlng.lng);
+    });
+    
+    console.log("✅ Carte initialisée avec succès");
+}
+
+// ============================================
+// GESTION DES MAISONS
+// ============================================
+
+function addHouse(lat, lng) {
+    // Créer un ID unique
+    const id = 'house_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    
+    // Créer la maison
+    const house = {
+        id: id,
+        lat: lat,
+        lng: lng,
+        address: `Maison à ${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+        status: STATUS.NOT_PASSED,
+        note: '',
+        createdBy: currentUser.email,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+    };
+    
+    // Ajouter à la liste
+    houses.push(house);
+    
+    // Sauvegarder
+    saveHouses();
+    
+    // Ajouter le marqueur
+    addMarker(house);
+    
+    // Mettre à jour les statistiques
+    updateStats();
+    
+    // Mettre à jour le classement
+    updateRanking();
+    
+    console.log("✅ Maison ajoutée:", house);
+}
+
+function updateHouseStatus(id, newStatus) {
+    const house = houses.find(h => h.id === id);
+    if (house) {
+        house.status = newStatus;
+        house.updatedAt = new Date().toISOString();
+        
+        // Mettre à jour le marqueur
+        updateMarker(house);
+        
+        // Sauvegarder
+        saveHouses();
+        
+        // Mettre à jour les statistiques
+        updateStats();
+        
+        // Mettre à jour le classement
+        updateRanking();
+        
+        console.log("🔄 Statut mis à jour:", house);
+    }
+}
+
+function updateHouseNote(id, newNote) {
+    const house = houses.find(h => h.id === id);
+    if (house) {
+        house.note = newNote;
+        house.updatedAt = new Date().toISOString();
+        
+        // Mettre à jour le marqueur
+        updateMarker(house);
+        
+        // Sauvegarder
+        saveHouses();
+        
+        console.log("📝 Note mise à jour:", house);
+    }
+}
+
+function deleteHouse(id) {
+    // Supprimer de la liste
+    houses = houses.filter(h => h.id !== id);
+    
+    // Supprimer le marqueur
+    removeMarker(id);
+    
+    // Sauvegarder
+    saveHouses();
+    
+    // Mettre à jour les statistiques
+    updateStats();
+    
+    // Mettre à jour le classement
+    updateRanking();
+    
+    console.log("🗑️ Maison supprimée:", id);
+}
+
+function saveHouses() {
+    localStorage.setItem('pompiers_houses', JSON.stringify(houses));
+}
+
+function saveUsers() {
+    localStorage.setItem('pompiers_users', JSON.stringify(users));
+}
+
+// ============================================
+// GESTION DES MARQUEURS
+// ============================================
+
+function addMarker(house) {
+    const marker = L.marker([house.lat, house.lng], {
+        icon: STATUS_ICONS[house.status]
+    }).addTo(map);
+    
+    markers.set(house.id, marker);
+    
+    marker.bindPopup(createPopupContent(house));
+    
+    marker.on('popupopen', function() {
+        setTimeout(() => {
+            const popupElement = marker.getPopup().getElement();
+            
+            const statusButtons = popupElement.querySelectorAll('.status-btn');
+            statusButtons.forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const houseId = this.getAttribute('data-id');
+                    const newStatus = this.getAttribute('data-status');
+                    
+                    updateHouseStatus(houseId, newStatus);
+                    
+                    marker.closePopup();
+                    setTimeout(() => {
+                        marker.openPopup();
+                    }, 100);
+                });
+            });
+            
+            const deleteBtn = popupElement.querySelector('.btn-delete');
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const houseId = this.getAttribute('data-id');
+                    
+                    if (confirm('Voulez-vous vraiment supprimer cette maison ?')) {
+                        deleteHouse(houseId);
+                    }
+                });
+            }
+            
+            const editBtn = popupElement.querySelector('.btn-edit');
+            if (editBtn) {
+                editBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const houseId = this.getAttribute('data-id');
+                    editNote(houseId);
+                });
+            }
+        }, 10);
+    });
+}
+
+function updateMarker(house) {
+    const marker = markers.get(house.id);
+    if (marker) {
+        marker.setIcon(STATUS_ICONS[house.status]);
+        marker.setPopupContent(createPopupContent(house));
+    }
+}
+
+function removeMarker(id) {
+    const marker = markers.get(id);
+    if (marker) {
+        map.removeLayer(marker);
+        markers.delete(id);
+    }
+}
+
+function createPopupContent(house) {
+    const user = users.find(u => u.email === house.createdBy);
+    const creatorName = user ? user.pseudo : 'Inconnu';
+    
+    return `
+        <div class="popup-content">
+            <div class="popup-address">${house.address}</div>
+            <div style="font-size: 12px; color: #666; margin-bottom: 5px;">
+                <i class="fas fa-user"></i> ${creatorName}
+            </div>
+            ${house.note ? `<div class="popup-note">${house.note}</div>` : ''}
+            
+            <div class="status-buttons">
+                <button class="status-btn" data-id="${house.id}" data-status="non_passé" 
+                        style="background-color: ${STATUS_COLORS['non_passé']}">
+                    Non passé
+                </button>
+                <button class="status-btn" data-id="${house.id}" data-status="acheté" 
+                        style="background-color: ${STATUS_COLORS['acheté']}">
+                    Acheté
+                </button>
+                <button class="status-btn" data-id="${house.id}" data-status="non_acheté" 
+                        style="background-color: ${STATUS_COLORS['non_acheté']}">
+                    Non acheté
+                </button>
+                <button class="status-btn" data-id="${house.id}" data-status="absent" 
+                        style="background-color: ${STATUS_COLORS['absent']}">
+                    Absent
+                </button>
+            </div>
+            
+            <div class="popup-actions">
+                <button class="btn-edit" data-id="${house.id}">
+                    <i class="fas fa-edit"></i> Note
+                </button>
+                <button class="btn-delete" data-id="${house.id}">
+                    <i class="fas fa-trash"></i> Supprimer
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+// ============================================
+// FONCTIONS D'INTERFACE
+// ============================================
+
+function editNote(houseId) {
+    const house = houses.find(h => h.id === houseId);
+    if (house) {
+        editingMarkerId = houseId;
+        document.getElementById('noteText').value = house.note;
+        document.getElementById('noteEditor').style.display = 'block';
+    }
+}
+
+function updateStats() {
+    if (!currentUser) return;
+    
+    const userHouses = houses.filter(house => house.createdBy === currentUser.email);
+    const total = userHouses.length;
+    const bought = userHouses.filter(h => h.status === STATUS.BOUGHT).length;
+    const notBought = userHouses.filter(h => h.status === STATUS.NOT_BOUGHT).length;
+    const absent = userHouses.filter(h => h.status === STATUS.ABSENT).length;
+    const score = calculateUserScore(currentUser.email);
+    
+    document.getElementById('statTotal').textContent = total;
+    document.getElementById('statBought').textContent = bought;
+    document.getElementById('statNotBought').textContent = notBought;
+    document.getElementById('statAbsent').textContent = absent;
+    
+    // Mettre à jour le pseudo dans le header
+    document.getElementById('userPseudo').textContent = currentUser.pseudo + ` (${score} pts)`;
+}
+
+function showError(message) {
+    const errorDiv = document.getElementById('errorMessage');
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+    
+    setTimeout(() => {
+        errorDiv.style.display = 'none';
+    }, 5000);
+}
+
+function showLoader() {
+    document.getElementById('loader').style.display = 'block';
+}
+
+function hideLoader() {
+    document.getElementById('loader').style.display = 'none';
+}
+
+// ============================================
+// AUTHENTIFICATION
+// ============================================
+
+function login(email, password, pseudo) {
+    if (!email) {
+        showError("Veuillez entrer votre email");
+        return;
+    }
+    
+    if (!pseudo) {
+        showError("Veuillez choisir un pseudo");
+        return;
+    }
+    
+    if (!password) {
+        showError("Veuillez entrer votre mot de passe");
+        return;
+    }
+    
+    if (password.length < 6) {
+        showError("Le mot de passe doit faire au moins 6 caractères");
+        return;
+    }
+    
+    showLoader();
+    
+    setTimeout(() => {
+        // Vérifier si l'utilisateur existe
+        const existingUser = users.find(u => u.email === email);
+        
+        if (existingUser) {
+            // Vérifier le mot de passe
+            if (existingUser.password !== password) {
+                hideLoader();
+                showError("Mot de passe incorrect");
+                return;
+            }
+            
+            // Mettre à jour le pseudo si changé
+            if (existingUser.pseudo !== pseudo) {
+                existingUser.pseudo = pseudo;
+                saveUsers();
+            }
+        } else {
+            // Nouvel utilisateur
+            users.push({
+                email: email,
+                pseudo: pseudo,
+                password: password,
+                createdAt: new Date().toISOString()
+            });
+            saveUsers();
+        }
+        
+        currentUser = {
+            email: email,
+            pseudo: pseudo,
+            isAdmin: email === ADMIN_EMAIL
+        };
+        
+        // Cacher l'écran de connexion
+        document.getElementById('loginScreen').style.display = 'none';
+        // Afficher l'application
+        document.getElementById('app').style.display = 'block';
+        // Afficher le pseudo
+        document.getElementById('userPseudo').textContent = pseudo;
+        
+        // Afficher le bouton RESET si admin
+        if (currentUser.isAdmin) {
+            document.getElementById('btnReset').style.display = 'block';
+            console.log("👑 Mode administrateur activé");
+        } else {
+            document.getElementById('btnReset').style.display = 'none';
+        }
+        
+        // Initialiser la carte si pas déjà fait
+        if (!map) {
+            initMap();
+            loadExistingHouses();
+        }
+        
+        // Mettre à jour les statistiques
+        updateStats();
+        updateRanking();
+        
+        console.log("✅ Connecté en tant que:", pseudo);
+        hideLoader();
+    }, 500);
+}
+
+function logout() {
+    currentUser = null;
+    
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+    
+    // Vider les champs de connexion
+    document.getElementById('email').value = '';
+    document.getElementById('pseudo').value = '';
+    document.getElementById('password').value = '';
+    
+    console.log("✅ Déconnecté");
+}
+
+function loadExistingHouses() {
+    houses.forEach(house => {
+        addMarker(house);
+    });
+    
+    console.log(`✅ ${houses.length} maisons chargées`);
+}
+
+function resetAllHouses() {
+    if (confirm('⚠️ ATTENTION ! Voulez-vous supprimer TOUTES les maisons ? Cette action est irréversible.')) {
+        markers.forEach(marker => {
+            map.removeLayer(marker);
+        });
+        markers.clear();
+        
+        houses = [];
+        saveHouses();
+        
+        updateStats();
+        updateRanking();
+        
+        console.log("✅ Toutes les maisons ont été supprimées");
+        alert("✅ Toutes les maisons ont été supprimées");
+    }
+}
+
+// ============================================
+// GESTION MOBILE
+// ============================================
+
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('active');
+}
+
+function toggleUserMenu() {
+    document.getElementById('userSection').classList.toggle('mobile-visible');
+}
+
+// ============================================
+// ÉVÉNEMENTS
+// ============================================
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("🚀 Application prête à démarrer");
+    
+    // Boutons de connexion
+    document.getElementById('btnLogin').addEventListener('click', function() {
+        const email = document.getElementById('email').value;
+        const pseudo = document.getElementById('pseudo').value;
+        const password = document.getElementById('password').value;
+        login(email, password, pseudo);
+    });
+    
+    document.getElementById('btnSignup').addEventListener('click', function() {
+        const email = document.getElementById('email').value;
+        const pseudo = document.getElementById('pseudo').value;
+        const password = document.getElementById('password').value;
+        login(email, password, pseudo); // Même fonction que login
+    });
+    
+    // Entrée pour se connecter
+    document.getElementById('password').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            const email = document.getElementById('email').value;
+            const pseudo = document.getElementById('pseudo').value;
+            const password = document.getElementById('password').value;
+            login(email, password, pseudo);
+        }
+    });
+    
+    // Bouton de déconnexion
+    document.getElementById('btnLogout').addEventListener('click', logout);
+    
+    // Bouton RESET (admin seulement)
+    document.getElementById('btnReset').addEventListener('click', resetAllHouses);
+    
+    // Éditeur de note
+    document.getElementById('btnSaveNote').addEventListener('click', function() {
+        if (editingMarkerId) {
+            const newNote = document.getElementById('noteText').value;
+            updateHouseNote(editingMarkerId, newNote);
+            document.getElementById('noteEditor').style.display = 'none';
+            editingMarkerId = null;
+        }
+    });
+    
+    document.getElementById('btnCancelNote').addEventListener('click', function() {
+        document.getElementById('noteEditor').style.display = 'none';
+        editingMarkerId = null;
+    });
+    
+    // Menu mobile
+    document.getElementById('menuToggle').addEventListener('click', toggleSidebar);
+    document.getElementById('userToggle').addEventListener('click', toggleUserMenu);
+    
+    // Fermer le menu au clic en dehors
+    document.addEventListener('click', function(e) {
+        const sidebar = document.getElementById('sidebar');
+        const userSection = document.getElementById('userSection');
+        
+        if (!sidebar.contains(e.target) && !e.target.closest('#menuToggle')) {
+            sidebar.classList.remove('active');
+        }
+        
+        if (!userSection.contains(e.target) && !e.target.closest('#userToggle')) {
+            userSection.classList.remove('mobile-visible');
+        }
+    });
+    
+    console.log("✅ Événements configurés");
+});
+
+console.log("✅ Script chargé avec succès");
+</script>
+
+</body>
+</html>
