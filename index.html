@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Calendrier Pompiers Bretagne</title>
+    <title>Calentour - Calendrier Pompiers</title>
     
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
-    <!-- Font Awesome pour les icônes -->
+    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
-        /* RESET */
+        /* Style général */
         * {
             margin: 0;
             padding: 0;
@@ -23,11 +23,13 @@
         body {
             background-color: #f0f0f0;
             height: 100vh;
+            width: 100vw;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
         
-        /* HEADER */
+        /* En-tête */
         .header {
             background: linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%);
             color: white;
@@ -38,6 +40,8 @@
             box-shadow: 0 3px 10px rgba(0,0,0,0.2);
             position: relative;
             z-index: 100;
+            flex-shrink: 0;
+            height: 60px;
         }
         
         .logo {
@@ -46,12 +50,23 @@
             gap: 10px;
         }
         
-        .logo i {
-            font-size: 24px;
+        .calendar-icon {
+            font-size: 28px;
+            color: white;
+            background: #ff9800;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.2);
         }
         
         .logo h1 {
-            font-size: 18px;
+            font-size: 20px;
+            font-weight: bold;
+            letter-spacing: 1px;
         }
         
         .user-section {
@@ -60,7 +75,7 @@
             gap: 10px;
         }
         
-        /* BOUTONS */
+        /* Boutons */
         button {
             background-color: #ff9800;
             color: white;
@@ -96,7 +111,7 @@
             background-color: #d32f2f;
         }
         
-        /* MENU MOBILE */
+        /* Menu mobile */
         .menu-toggle {
             display: none;
             background: none;
@@ -104,23 +119,31 @@
             color: white;
             font-size: 20px;
             cursor: pointer;
+            width: 40px;
+            height: 40px;
+            align-items: center;
+            justify-content: center;
         }
         
-        /* CONTENU PRINCIPAL */
+        /* Contenu principal - CORRIGÉ POUR PC */
         .container {
             display: flex;
             flex: 1;
             overflow: hidden;
+            position: relative;
+            height: calc(100vh - 60px); /* Hauteur fixe pour PC */
         }
         
-        /* CARTE */
+        /* Carte - CORRIGÉ POUR PC */
         #map {
             flex: 1;
-            height: calc(100vh - 60px);
+            height: 100%;
+            width: 100%;
             z-index: 1;
+            min-height: 400px; /* Hauteur minimum pour PC */
         }
         
-        /* SIDEBAR */
+        /* Barre latérale */
         .sidebar {
             width: 350px;
             background-color: white;
@@ -131,9 +154,23 @@
             flex-direction: column;
             gap: 15px;
             transition: transform 0.3s ease;
+            position: relative;
+            z-index: 50;
         }
         
-        /* SECTION */
+        /* Overlay pour mobile */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 60px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 49;
+        }
+        
+        /* Sections */
         .section {
             background-color: #f9f9f9;
             border-radius: 10px;
@@ -152,7 +189,7 @@
             gap: 8px;
         }
         
-        /* STATISTIQUES */
+        /* Statistiques */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -179,7 +216,7 @@
             margin-top: 3px;
         }
         
-        /* CLASSEMENT */
+        /* Classement */
         .ranking-list {
             max-height: 200px;
             overflow-y: auto;
@@ -196,20 +233,23 @@
             margin-bottom: 5px;
         }
         
-        .ranking-item:last-child {
-            border-bottom: none;
-            margin-bottom: 0;
-        }
-        
         .rank {
             font-weight: bold;
             color: #d32f2f;
             min-width: 25px;
         }
         
-        .rank-1 { color: #FFD700; }
-        .rank-2 { color: #C0C0C0; }
-        .rank-3 { color: #CD7F32; }
+        .rank-1 {
+            color: #FFD700; /* Or */
+        }
+        
+        .rank-2 {
+            color: #C0C0C0; /* Argent */
+        }
+        
+        .rank-3 {
+            color: #CD7F32; /* Bronze */
+        }
         
         .user-info {
             display: flex;
@@ -243,7 +283,7 @@
             text-align: right;
         }
         
-        /* LÉGENDE */
+        /* Légende */
         .legend-item {
             display: flex;
             align-items: center;
@@ -259,10 +299,11 @@
             box-shadow: 0 0 5px rgba(0,0,0,0.2);
         }
         
-        /* POPUP */
+        /* Fenêtre popup */
         .popup-content {
             padding: 10px;
             min-width: 250px;
+            max-width: 300px;
         }
         
         .popup-address {
@@ -279,6 +320,7 @@
             border-radius: 5px;
             margin-bottom: 12px;
             font-size: 13px;
+            word-break: break-word;
         }
         
         .status-buttons {
@@ -337,7 +379,7 @@
             background-color: #1976D2;
         }
         
-        /* ÉCRAN DE CONNEXION */
+        /* Écran de connexion */
         .login-screen {
             display: flex;
             justify-content: center;
@@ -361,6 +403,16 @@
             color: #d32f2f;
             margin-bottom: 20px;
             font-size: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .login-box .calendar-icon {
+            background: #d32f2f;
+            width: 35px;
+            height: 35px;
         }
         
         .input-group {
@@ -420,7 +472,7 @@
             font-size: 14px;
         }
         
-        /* ÉDITEUR DE NOTE */
+        /* Éditeur de note */
         .note-editor {
             display: none;
             position: fixed;
@@ -462,7 +514,7 @@
             gap: 10px;
         }
         
-        /* LOADER */
+        /* Chargement */
         .loader {
             display: none;
             position: fixed;
@@ -486,39 +538,58 @@
             100% { transform: rotate(360deg); }
         }
         
-        /* RESPONSIVE - MOBILE */
+        /* Responsive - Mobile */
         @media (max-width: 768px) {
             .header {
                 padding: 10px;
+                height: 60px;
             }
             
             .logo h1 {
-                font-size: 16px;
+                font-size: 18px;
+            }
+            
+            .calendar-icon {
+                width: 35px;
+                height: 35px;
+                font-size: 24px;
             }
             
             .menu-toggle {
-                display: block;
+                display: flex;
             }
             
             .user-section {
                 display: none;
-            }
-            
-            .user-section.mobile-visible {
-                display: flex;
-                flex-direction: column;
                 position: absolute;
-                top: 100%;
+                top: 60px;
                 right: 0;
                 background-color: #d32f2f;
                 padding: 15px;
                 border-radius: 0 0 0 10px;
                 box-shadow: 0 4px 10px rgba(0,0,0,0.2);
                 z-index: 101;
+                flex-direction: column;
+                width: 200px;
+            }
+            
+            .user-section.mobile-visible {
+                display: flex;
             }
             
             .container {
                 flex-direction: column;
+                height: calc(100vh - 60px);
+            }
+            
+            #map {
+                height: 100%;
+                width: 100%;
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
             }
             
             .sidebar {
@@ -526,18 +597,19 @@
                 right: 0;
                 top: 60px;
                 bottom: 0;
-                width: 100%;
+                width: 85%;
                 max-width: 320px;
                 transform: translateX(100%);
-                z-index: 99;
+                z-index: 100;
+                background-color: white;
             }
             
             .sidebar.active {
                 transform: translateX(0);
             }
             
-            #map {
-                height: calc(100vh - 60px);
+            .sidebar-overlay.active {
+                display: block;
             }
             
             .stats-grid {
@@ -552,19 +624,24 @@
                 padding: 6px 10px;
                 font-size: 13px;
             }
+            
+            .popup-content {
+                min-width: 220px;
+                max-width: 280px;
+            }
         }
         
         @media (max-width: 480px) {
+            .sidebar {
+                width: 90%;
+            }
+            
             .login-box {
                 padding: 20px;
             }
             
             .login-box h2 {
                 font-size: 20px;
-            }
-            
-            .sidebar {
-                max-width: 280px;
             }
             
             .section {
@@ -574,15 +651,23 @@
             .section h3 {
                 font-size: 15px;
             }
+        }
+        
+        /* Pour PC - Correction supplémentaire */
+        @media (min-width: 769px) {
+            .container {
+                height: calc(100vh - 60px);
+            }
             
-            .popup-content {
-                min-width: 220px;
+            #map {
+                height: 100%;
+                min-height: 500px;
             }
         }
         
-        /* SCROLLBAR */
+        /* Barre de défilement */
         ::-webkit-scrollbar {
-            width: 8px;
+            width: 6px;
         }
         
         ::-webkit-scrollbar-track {
@@ -598,16 +683,32 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #b71c1c;
         }
+        
+        /* Animation pour les points */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        .new-house {
+            animation: pulse 0.5s ease-in-out 3;
+        }
     </style>
 </head>
 <body>
 
-<!-- ÉCRAN DE CONNEXION -->
+<!-- Écran de connexion -->
 <div id="loginScreen" class="login-screen">
     <div class="login-box">
-        <h2><i class="fas fa-fire-extinguisher"></i> Pompiers Bretagne</h2>
+        <h2>
+            <div class="calendar-icon">
+                <i class="fas fa-calendar-alt"></i>
+            </div>
+            Calentour
+        </h2>
         <p style="text-align: center; color: #666; margin-bottom: 20px; font-size: 14px;">
-            Gestion des tournées du calendrier
+            Tournée du calendrier des pompiers
         </p>
         
         <div class="input-group">
@@ -635,24 +736,21 @@
         </div>
         
         <div id="errorMessage" class="error-message"></div>
-        
-        <p style="text-align: center; margin-top: 15px; color: #888; font-size: 12px;">
-            
-        </p>
     </div>
 </div>
 
-<!-- APPLICATION PRINCIPALE -->
+<!-- Application principale -->
 <div id="app" style="display: none;">
-    <!-- HEADER -->
     <div class="header">
         <button class="menu-toggle" id="menuToggle">
             <i class="fas fa-bars"></i>
         </button>
         
         <div class="logo">
-            <i class="fas fa-fire-extinguisher"></i>
-            <h1>Calendrier Pompiers</h1>
+            <div class="calendar-icon">
+                <i class="fas fa-calendar-alt"></i>
+            </div>
+            <h1>Calentour</h1>
         </div>
         
         <button class="menu-toggle" id="userToggle">
@@ -670,14 +768,12 @@
         </div>
     </div>
     
-    <!-- CONTENU PRINCIPAL -->
     <div class="container">
-        <!-- CARTE -->
         <div id="map"></div>
         
-        <!-- SIDEBAR -->
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+        
         <div class="sidebar" id="sidebar">
-            <!-- STATISTIQUES PERSONNELLES -->
             <div class="section">
                 <h3><i class="fas fa-chart-bar"></i> Mes Statistiques</h3>
                 <div class="stats-grid">
@@ -700,24 +796,13 @@
                 </div>
             </div>
             
-            <!-- CLASSEMENT -->
             <div class="section">
                 <h3><i class="fas fa-trophy"></i> Classement</h3>
                 <div class="ranking-list" id="rankingList">
-                    <!-- Les scores seront ajoutés ici dynamiquement -->
-                    <div class="ranking-item">
-                        <span class="rank rank-1">1</span>
-                        <div class="user-info">
-                            <div class="user-avatar">JD</div>
-                            <span class="user-name">Jean Dupont</span>
-                        </div>
-                        <span class="user-score">42 pts</span>
-                    </div>
-                    <!-- Plus d'items seront ajoutés dynamiquement -->
+                    <div style="text-align: center; color: #888; padding: 20px;">Chargement...</div>
                 </div>
             </div>
             
-            <!-- LÉGENDE -->
             <div class="section">
                 <h3><i class="fas fa-key"></i> Légende</h3>
                 <div class="legend-item">
@@ -738,7 +823,6 @@
                 </div>
             </div>
             
-            <!-- INSTRUCTIONS -->
             <div class="section">
                 <h3><i class="fas fa-info-circle"></i> Instructions</h3>
                 <p style="font-size: 13px; line-height: 1.4; color: #555;">
@@ -753,7 +837,7 @@
     </div>
 </div>
 
-<!-- ÉDITEUR DE NOTE -->
+<!-- Éditeur de note -->
 <div id="noteEditor" class="note-editor">
     <h3>Modifier la note</h3>
     <textarea id="noteText" placeholder="Ex: Repasser après 18h, 2ème étage, chien méchant..."></textarea>
@@ -763,31 +847,27 @@
     </div>
 </div>
 
-<!-- LOADER -->
+<!-- Chargement -->
 <div id="loader" class="loader">
     <div class="spinner"></div>
 </div>
 
-<!-- SCRIPT -->
+<!-- Script JavaScript -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-// ============================================
 // CONFIGURATION
-// ============================================
-
-// Variables globales
 let map;
 let markers = new Map();
 let currentUser = null;
 let editingMarkerId = null;
 
-// Adresse email de l'admin (VOUS - objectifcup@gmail.com)
+// Email de l'admin (VOUS)
 const ADMIN_EMAIL = "objectifcup@gmail.com";
 
-// Données de test (stockage local)
-let houses = JSON.parse(localStorage.getItem('pompiers_houses')) || [];
-let users = JSON.parse(localStorage.getItem('pompiers_users')) || [];
+// Données (stockage local)
+let houses = JSON.parse(localStorage.getItem('calentour_houses')) || [];
+let users = JSON.parse(localStorage.getItem('calentour_users')) || [];
 
 // Système de points
 const POINTS = {
@@ -797,7 +877,7 @@ const POINTS = {
     'non_passé': 0    // 0 point pour non passé
 };
 
-// Statuts
+// Statuts des maisons
 const STATUS = {
     NOT_PASSED: 'non_passé',
     BOUGHT: 'acheté',
@@ -813,33 +893,34 @@ const STATUS_COLORS = {
     'absent': '#2196F3'
 };
 
-// Icônes Leaflet
+// Création des icônes pour la carte
 const STATUS_ICONS = {};
 for (const [status, color] of Object.entries(STATUS_COLORS)) {
     STATUS_ICONS[status] = L.divIcon({
         html: `<div style="background-color: ${color}; width: 25px; height: 25px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3);"></div>`,
         iconSize: [25, 25],
-        iconAnchor: [12, 12]
+        iconAnchor: [12, 12],
+        className: 'house-marker'
     });
 }
 
-// ============================================
 // FONCTIONS UTILITAIRES
-// ============================================
 
+// Récupérer les initiales d'un pseudo
 function getInitials(name) {
     return name.split(' ').map(word => word[0]).join('').toUpperCase().substring(0, 2);
 }
 
+// Calculer le score d'un utilisateur
 function calculateUserScore(email) {
     const userHouses = houses.filter(house => house.createdBy === email);
     return userHouses.reduce((total, house) => total + (POINTS[house.status] || 0), 0);
 }
 
+// Calculer tous les scores
 function calculateAllScores() {
     const scores = {};
     
-    // Pour chaque utilisateur enregistré
     users.forEach(user => {
         scores[user.email] = {
             pseudo: user.pseudo,
@@ -848,10 +929,10 @@ function calculateAllScores() {
         };
     });
     
-    // Trier par score décroissant
     return Object.values(scores).sort((a, b) => b.score - a.score);
 }
 
+// Mettre à jour le classement
 function updateRanking() {
     const scores = calculateAllScores();
     const rankingList = document.getElementById('rankingList');
@@ -883,15 +964,20 @@ function updateRanking() {
     rankingList.innerHTML = html;
 }
 
-// ============================================
-// INITIALISATION DE LA CARTE
-// ============================================
-
+// INITIALISATION DE LA CARTE - SIMPLIFIÉE
 function initMap() {
     console.log("🗺️ Initialisation de la carte de Bretagne...");
     
+    // Vider la carte si elle existe déjà
+    if (map) {
+        map.remove();
+    }
+    
+    // Créer la carte avec une hauteur fixe
+    map = L.map('map');
+    
     // Centrer sur la Bretagne
-    map = L.map('map').setView([48.2020, -2.9326], 9);
+    map.setView([48.2020, -2.9326], 9);
     
     // Ajouter les tuiles OpenStreetMap
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -905,7 +991,11 @@ function initMap() {
         [47.0, -5.0], // Sud-ouest
         [49.0, -1.0]  // Nord-est
     );
-    map.setMaxBounds(bounds);
+    
+    // Sur PC seulement, limiter la carte à la Bretagne
+    if (window.innerWidth > 768) {
+        map.setMaxBounds(bounds);
+    }
     
     // Gérer le clic sur la carte
     map.on('click', function(e) {
@@ -915,12 +1005,16 @@ function initMap() {
         addHouse(e.latlng.lat, e.latlng.lng);
     });
     
+    // S'assurer que la carte est correctement dimensionnée
+    setTimeout(() => {
+        map.invalidateSize();
+        console.log("✅ Carte redimensionnée");
+    }, 100);
+    
     console.log("✅ Carte initialisée avec succès");
 }
 
-// ============================================
 // GESTION DES MAISONS
-// ============================================
 
 function addHouse(lat, lng) {
     // Créer un ID unique
@@ -1015,30 +1109,35 @@ function deleteHouse(id) {
 }
 
 function saveHouses() {
-    localStorage.setItem('pompiers_houses', JSON.stringify(houses));
+    localStorage.setItem('calentour_houses', JSON.stringify(houses));
 }
 
 function saveUsers() {
-    localStorage.setItem('pompiers_users', JSON.stringify(users));
+    localStorage.setItem('calentour_users', JSON.stringify(users));
 }
 
-// ============================================
 // GESTION DES MARQUEURS
-// ============================================
 
 function addMarker(house) {
     const marker = L.marker([house.lat, house.lng], {
-        icon: STATUS_ICONS[house.status]
+        icon: STATUS_ICONS[house.status],
+        title: house.address
     }).addTo(map);
     
     markers.set(house.id, marker);
     
-    marker.bindPopup(createPopupContent(house));
+    marker.bindPopup(createPopupContent(house), {
+        maxWidth: 300
+    });
+    
+    // Animation pour nouveau marqueur
+    marker.getElement().classList.add('new-house');
     
     marker.on('popupopen', function() {
         setTimeout(() => {
             const popupElement = marker.getPopup().getElement();
             
+            // Boutons de statut
             const statusButtons = popupElement.querySelectorAll('.status-btn');
             statusButtons.forEach(btn => {
                 btn.addEventListener('click', function(e) {
@@ -1055,6 +1154,7 @@ function addMarker(house) {
                 });
             });
             
+            // Bouton de suppression
             const deleteBtn = popupElement.querySelector('.btn-delete');
             if (deleteBtn) {
                 deleteBtn.addEventListener('click', function(e) {
@@ -1067,6 +1167,7 @@ function addMarker(house) {
                 });
             }
             
+            // Bouton d'édition de note
             const editBtn = popupElement.querySelector('.btn-edit');
             if (editBtn) {
                 editBtn.addEventListener('click', function(e) {
@@ -1103,7 +1204,7 @@ function createPopupContent(house) {
         <div class="popup-content">
             <div class="popup-address">${house.address}</div>
             <div style="font-size: 12px; color: #666; margin-bottom: 5px;">
-                <i class="fas fa-user"></i> ${creatorName}
+                <i class="fas fa-user"></i> Ajouté par ${creatorName}
             </div>
             ${house.note ? `<div class="popup-note">${house.note}</div>` : ''}
             
@@ -1138,9 +1239,7 @@ function createPopupContent(house) {
     `;
 }
 
-// ============================================
-// FONCTIONS D'INTERFACE
-// ============================================
+// INTERFACE UTILISATEUR
 
 function editNote(houseId) {
     const house = houses.find(h => h.id === houseId);
@@ -1180,17 +1279,7 @@ function showError(message) {
     }, 5000);
 }
 
-function showLoader() {
-    document.getElementById('loader').style.display = 'block';
-}
-
-function hideLoader() {
-    document.getElementById('loader').style.display = 'none';
-}
-
-// ============================================
 // AUTHENTIFICATION
-// ============================================
 
 function login(email, password, pseudo) {
     if (!email) {
@@ -1213,7 +1302,7 @@ function login(email, password, pseudo) {
         return;
     }
     
-    showLoader();
+    document.getElementById('loader').style.display = 'block';
     
     setTimeout(() => {
         // Vérifier si l'utilisateur existe
@@ -1222,7 +1311,7 @@ function login(email, password, pseudo) {
         if (existingUser) {
             // Vérifier le mot de passe
             if (existingUser.password !== password) {
-                hideLoader();
+                document.getElementById('loader').style.display = 'none';
                 showError("Mot de passe incorrect");
                 return;
             }
@@ -1264,18 +1353,19 @@ function login(email, password, pseudo) {
             document.getElementById('btnReset').style.display = 'none';
         }
         
-        // Initialiser la carte si pas déjà fait
-        if (!map) {
+        // Initialiser la carte
+        setTimeout(() => {
             initMap();
             loadExistingHouses();
-        }
+            
+            // Mettre à jour les statistiques
+            updateStats();
+            updateRanking();
+            
+            console.log("✅ Connecté en tant que:", pseudo);
+            document.getElementById('loader').style.display = 'none';
+        }, 100);
         
-        // Mettre à jour les statistiques
-        updateStats();
-        updateRanking();
-        
-        console.log("✅ Connecté en tant que:", pseudo);
-        hideLoader();
     }, 500);
 }
 
@@ -1319,24 +1409,31 @@ function resetAllHouses() {
     }
 }
 
-// ============================================
 // GESTION MOBILE
-// ============================================
 
 function toggleSidebar() {
-    document.getElementById('sidebar').classList.toggle('active');
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    
+    sidebar.classList.toggle('active');
+    overlay.classList.toggle('active');
+    
+    // Redimensionner la carte quand le sidebar s'ouvre/ferme
+    setTimeout(() => {
+        if (map) {
+            map.invalidateSize();
+        }
+    }, 300);
 }
 
 function toggleUserMenu() {
     document.getElementById('userSection').classList.toggle('mobile-visible');
 }
 
-// ============================================
-// ÉVÉNEMENTS
-// ============================================
+// GESTION DES ÉVÉNEMENTS
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("🚀 Application prête à démarrer");
+    console.log("🚀 Calentour prêt à démarrer");
     
     // Boutons de connexion
     document.getElementById('btnLogin').addEventListener('click', function() {
@@ -1350,7 +1447,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const email = document.getElementById('email').value;
         const pseudo = document.getElementById('pseudo').value;
         const password = document.getElementById('password').value;
-        login(email, password, pseudo); // Même fonction que login
+        login(email, password, pseudo);
     });
     
     // Entrée pour se connecter
@@ -1358,7 +1455,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'Enter') {
             const email = document.getElementById('email').value;
             const pseudo = document.getElementById('pseudo').value;
-            const password = document.getElementById('password').value;
+            const password = this.value;
             login(email, password, pseudo);
         }
     });
@@ -1388,24 +1485,32 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('menuToggle').addEventListener('click', toggleSidebar);
     document.getElementById('userToggle').addEventListener('click', toggleUserMenu);
     
-    // Fermer le menu au clic en dehors
+    // Overlay pour fermer le sidebar
+    document.getElementById('sidebarOverlay').addEventListener('click', toggleSidebar);
+    
+    // Fermer le menu utilisateur au clic en dehors
     document.addEventListener('click', function(e) {
-        const sidebar = document.getElementById('sidebar');
         const userSection = document.getElementById('userSection');
+        const userToggle = document.getElementById('userToggle');
         
-        if (!sidebar.contains(e.target) && !e.target.closest('#menuToggle')) {
-            sidebar.classList.remove('active');
-        }
-        
-        if (!userSection.contains(e.target) && !e.target.closest('#userToggle')) {
+        if (!userSection.contains(e.target) && !userToggle.contains(e.target)) {
             userSection.classList.remove('mobile-visible');
+        }
+    });
+    
+    // Redimensionner la carte quand la fenêtre change
+    window.addEventListener('resize', function() {
+        if (map) {
+            setTimeout(() => {
+                map.invalidateSize();
+            }, 100);
         }
     });
     
     console.log("✅ Événements configurés");
 });
 
-console.log("✅ Script chargé avec succès");
+console.log("✅ Calentour chargé avec succès");
 </script>
 
 </body>
