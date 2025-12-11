@@ -111,6 +111,22 @@
             background-color: #d32f2f;
         }
         
+        .btn-locate {
+            background-color: #2196F3;
+        }
+        
+        .btn-locate:hover {
+            background-color: #1976D2;
+        }
+        
+        .btn-track {
+            background-color: #9C27B0;
+        }
+        
+        .btn-track:hover {
+            background-color: #7B1FA2;
+        }
+        
         /* Menu mobile */
         .menu-toggle {
             display: none;
@@ -538,6 +554,70 @@
             100% { transform: rotate(360deg); }
         }
         
+        /* Style pour le marqueur de position utilisateur */
+        .user-location-marker {
+            background-color: #2196F3;
+            border: 3px solid white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            box-shadow: 0 0 10px rgba(33, 150, 243, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .user-location-pulse {
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(33, 150, 243, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 15px rgba(33, 150, 243, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(33, 150, 243, 0);
+            }
+        }
+        
+        /* Bouton flottant pour mobile */
+        .floating-locate {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        
+        .floating-locate button {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        
+        /* Animation pour les points */
+        @keyframes housePulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        .new-house {
+            animation: housePulse 0.5s ease-in-out 3;
+        }
+        
         /* Responsive - Mobile */
         @media (max-width: 768px) {
             .header {
@@ -571,6 +651,7 @@
                 z-index: 101;
                 flex-direction: column;
                 width: 200px;
+                gap: 8px;
             }
             
             .user-section.mobile-visible {
@@ -629,6 +710,10 @@
                 min-width: 220px;
                 max-width: 280px;
             }
+            
+            .floating-locate {
+                display: block;
+            }
         }
         
         @media (max-width: 480px) {
@@ -682,17 +767,6 @@
         
         ::-webkit-scrollbar-thumb:hover {
             background: #b71c1c;
-        }
-        
-        /* Animation pour les points */
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
-        }
-        
-        .new-house {
-            animation: pulse 0.5s ease-in-out 3;
         }
     </style>
 </head>
@@ -758,6 +832,12 @@
         </button>
         
         <div class="user-section" id="userSection">
+            <button id="btnLocate" class="btn-locate">
+                <i class="fas fa-location-arrow"></i> Ma position
+            </button>
+            <button id="btnTrack" class="btn-track">
+                <i class="fas fa-satellite"></i> Suivre
+            </button>
             <span id="userPseudo"></span>
             <button id="btnLogout" class="btn-logout">
                 <i class="fas fa-sign-out-alt"></i> Déconnexion
@@ -821,6 +901,10 @@
                     <div class="color-box" style="background-color: #2196F3;"></div>
                     <span>Absent</span>
                 </div>
+                <div class="legend-item">
+                    <div class="color-box" style="background-color: #2196F3; border: 2px dashed #fff;"></div>
+                    <span>Votre position</span>
+                </div>
             </div>
             
             <div class="section">
@@ -828,13 +912,21 @@
                 <p style="font-size: 13px; line-height: 1.4; color: #555;">
                     1. <strong>Cliquez sur la carte</strong> pour ajouter une maison<br>
                     2. <strong>Cliquez sur un point</strong> pour changer le statut<br>
-                    3. <strong>Supprimer un point</strong> : bouton dans le popup<br>
-                    4. <strong>Classement</strong> : 10pts acheté, 5pts absent, 1pt non acheté<br>
-                    5. <strong>RESET</strong> : admin seulement
+                    3. <strong>Bouton "Ma position"</strong> : vous localise sur la carte<br>
+                    4. <strong>Bouton "Suivre"</strong> : suit votre déplacement<br>
+                    5. <strong>Classement</strong> : 10pts acheté, 5pts absent, 1pt non acheté<br>
+                    6. <strong>RESET</strong> : admin seulement
                 </p>
             </div>
         </div>
     </div>
+</div>
+
+<!-- Bouton flottant pour mobile -->
+<div id="floatingLocate" class="floating-locate">
+    <button>
+        <i class="fas fa-location-arrow"></i>
+    </button>
 </div>
 
 <!-- Éditeur de note -->
@@ -861,6 +953,12 @@ let map;
 let markers = new Map();
 let currentUser = null;
 let editingMarkerId = null;
+
+// Variables pour la géolocalisation
+let userLocationMarker = null;
+let userLocationCircle = null;
+let isTrackingLocation = false;
+let watchId = null;
 
 // Email de l'admin (VOUS)
 const ADMIN_EMAIL = "objectifcup@gmail.com";
@@ -930,6 +1028,179 @@ function calculateAllScores() {
     });
     
     return Object.values(scores).sort((a, b) => b.score - a.score);
+}
+
+// FONCTIONS DE GÉOLOCALISATION
+
+function locateUser() {
+    if (!navigator.geolocation) {
+        alert("La géolocalisation n'est pas supportée par votre navigateur");
+        return;
+    }
+    
+    showLoader();
+    
+    navigator.geolocation.getCurrentPosition(
+        function(position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const accuracy = position.coords.accuracy;
+            
+            // Vérifier si on est en Bretagne
+            if (!isInBrittany(lat, lng)) {
+                hideLoader();
+                if (!confirm("Vous semblez être en dehors de la Bretagne. Voulez-vous quand même centrer la carte sur votre position ?")) {
+                    return;
+                }
+            }
+            
+            // Centrer la carte sur la position de l'utilisateur
+            map.setView([lat, lng], 16);
+            
+            // Ajouter ou mettre à jour le marqueur
+            updateUserLocationMarker(lat, lng, accuracy);
+            
+            hideLoader();
+            
+            console.log("📍 Position trouvée:", lat, lng, "Précision:", accuracy, "m");
+        },
+        function(error) {
+            hideLoader();
+            
+            let errorMessage;
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    errorMessage = "Vous avez refusé la géolocalisation. Activez-la dans les paramètres de votre navigateur.";
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    errorMessage = "Les informations de localisation sont indisponibles.";
+                    break;
+                case error.TIMEOUT:
+                    errorMessage = "La requête de localisation a expiré.";
+                    break;
+                default:
+                    errorMessage = "Une erreur inconnue est survenue.";
+            }
+            
+            alert("Erreur de géolocalisation : " + errorMessage);
+            console.error("❌ Erreur de géolocalisation:", error);
+        },
+        {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+        }
+    );
+}
+
+function toggleLocationTracking() {
+    if (!navigator.geolocation) {
+        alert("La géolocalisation n'est pas supportée par votre navigateur");
+        return;
+    }
+    
+    if (isTrackingLocation) {
+        // Arrêter le suivi
+        navigator.geolocation.clearWatch(watchId);
+        isTrackingLocation = false;
+        document.getElementById('btnTrack').innerHTML = '<i class="fas fa-satellite"></i> Suivre';
+        console.log("📍 Suivi de position arrêté");
+    } else {
+        // Démarrer le suivi
+        showLoader();
+        
+        watchId = navigator.geolocation.watchPosition(
+            function(position) {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                const accuracy = position.coords.accuracy;
+                
+                updateUserLocationMarker(lat, lng, accuracy);
+                
+                // Si c'est la première position, centrer la carte
+                if (!isTrackingLocation) {
+                    map.setView([lat, lng], 16);
+                }
+                
+                isTrackingLocation = true;
+                hideLoader();
+                document.getElementById('btnTrack').innerHTML = '<i class="fas fa-satellite-dish"></i> Arrêter';
+                
+                console.log("📍 Position mise à jour:", lat, lng);
+            },
+            function(error) {
+                hideLoader();
+                console.error("❌ Erreur de suivi:", error);
+                
+                if (error.code === error.PERMISSION_DENIED) {
+                    alert("Permission de géolocalisation refusée. Activez-la dans les paramètres.");
+                }
+            },
+            {
+                enableHighAccuracy: true,
+                maximumAge: 10000,
+                timeout: 5000
+            }
+        );
+    }
+}
+
+function updateUserLocationMarker(lat, lng, accuracy) {
+    // Supprimer l'ancien marqueur s'il existe
+    if (userLocationMarker) {
+        map.removeLayer(userLocationMarker);
+    }
+    if (userLocationCircle) {
+        map.removeLayer(userLocationCircle);
+    }
+    
+    // Créer un marqueur personnalisé pour la position de l'utilisateur
+    const userIcon = L.divIcon({
+        html: `<div class="user-location-marker user-location-pulse">
+                  <i class="fas fa-user" style="color: white; font-size: 10px;"></i>
+               </div>`,
+        iconSize: [20, 20],
+        iconAnchor: [10, 10],
+        className: 'user-location-icon'
+    });
+    
+    // Ajouter le marqueur
+    userLocationMarker = L.marker([lat, lng], {
+        icon: userIcon,
+        zIndexOffset: 1000
+    }).addTo(map);
+    
+    // Ajouter un cercle de précision
+    if (accuracy < 1000) {
+        userLocationCircle = L.circle([lat, lng], {
+            color: '#2196F3',
+            fillColor: '#2196F3',
+            fillOpacity: 0.1,
+            radius: accuracy
+        }).addTo(map);
+    }
+    
+    // Ajouter un popup d'information
+    userLocationMarker.bindPopup(`
+        <div style="text-align: center; padding: 5px;">
+            <strong>Votre position</strong><br>
+            Précision: ${Math.round(accuracy)} mètres<br>
+            <small>${lat.toFixed(5)}, ${lng.toFixed(5)}</small>
+        </div>
+    `);
+}
+
+function isInBrittany(lat, lng) {
+    // Vérifier si les coordonnées sont dans les limites de la Bretagne
+    return lat >= 47.0 && lat <= 49.0 && lng >= -5.0 && lng <= -1.0;
+}
+
+function showLoader() {
+    document.getElementById('loader').style.display = 'block';
+}
+
+function hideLoader() {
+    document.getElementById('loader').style.display = 'none';
 }
 
 // Mettre à jour le classement
@@ -1370,6 +1641,22 @@ function login(email, password, pseudo) {
 }
 
 function logout() {
+    // Arrêter le suivi de position si actif
+    if (isTrackingLocation) {
+        navigator.geolocation.clearWatch(watchId);
+        isTrackingLocation = false;
+    }
+    
+    // Supprimer le marqueur de position
+    if (userLocationMarker) {
+        map.removeLayer(userLocationMarker);
+        userLocationMarker = null;
+    }
+    if (userLocationCircle) {
+        map.removeLayer(userLocationCircle);
+        userLocationCircle = null;
+    }
+    
     currentUser = null;
     
     document.getElementById('loginScreen').style.display = 'flex';
@@ -1465,6 +1752,15 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Bouton RESET (admin seulement)
     document.getElementById('btnReset').addEventListener('click', resetAllHouses);
+    
+    // Bouton de localisation
+    document.getElementById('btnLocate').addEventListener('click', locateUser);
+    
+    // Bouton de suivi
+    document.getElementById('btnTrack').addEventListener('click', toggleLocationTracking);
+    
+    // Bouton flottant pour mobile
+    document.querySelector('.floating-locate button').addEventListener('click', locateUser);
     
     // Éditeur de note
     document.getElementById('btnSaveNote').addEventListener('click', function() {
