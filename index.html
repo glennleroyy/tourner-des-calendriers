@@ -14,10 +14,6 @@
     <!-- Chart.js pour les graphiques -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
-    <!-- Leaflet Geocoder pour la recherche d'adresses -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
-    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
-    
     <style>
         /* Style général */
         * {
@@ -350,6 +346,14 @@
             margin-bottom: 8px;
             color: #333;
             font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        .popup-coordinates {
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 5px;
+            font-style: italic;
         }
         
         .popup-note {
@@ -869,23 +873,6 @@
             animation: housePulse 0.5s ease-in-out 3;
         }
         
-        /* Barre de recherche */
-        .leaflet-control-geocoder {
-            border-radius: 5px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-        
-        .leaflet-control-geocoder-form {
-            width: 250px;
-        }
-        
-        .leaflet-control-geocoder-form input {
-            width: 100%;
-            padding: 8px;
-            border: 2px solid #ddd;
-            border-radius: 4px;
-        }
-        
         /* Instructions pour l'adresse */
         .address-instructions {
             background-color: #e8f5e8;
@@ -1014,8 +1001,9 @@
                 display: block;
             }
             
-            .leaflet-control-geocoder-form {
-                width: 200px;
+            /* Ajustements pour mobile */
+            .btn-add-house {
+                display: none; /* Caché sur mobile, utilise le bouton flottant */
             }
         }
         
@@ -1042,10 +1030,6 @@
             
             .chart-screen {
                 padding: 15px;
-            }
-            
-            .leaflet-control-geocoder-form {
-                width: 150px;
             }
         }
         
@@ -1113,7 +1097,7 @@
         </div>
         
         <div class="input-group">
-            <label for="password">Mot de passe</label>
+            <label for="password">Motant de passe</label>
             <input type="password" id="password" placeholder="Votre mot de passe">
         </div>
         
@@ -1238,14 +1222,13 @@
             <div class="section">
                 <h3><i class="fas fa-info-circle"></i> Instructions</h3>
                 <p style="font-size: 13px; line-height: 1.4; color: #555;">
-                    1. <strong>Bouton "Ajouter une maison"</strong> : pour placer une nouvelle adresse<br>
-                    2. <strong>Cliquez sur un point</strong> pour changer le statut<br>
+                    1. <strong>Cliquez sur une maison</strong> pour changer son statut<br>
+                    2. <strong>Bouton "Ajouter une maison"</strong> : pour ajouter une nouvelle maison<br>
                     3. <strong>Bouton "Ma position"</strong> : vous localise sur la carte<br>
                     4. <strong>Bouton "Suivre"</strong> : suit votre déplacement<br>
                     5. <strong>Classement</strong> : 10pts acheté, 5pts absent, 1pt non acheté<br>
                     6. <strong>Statistiques</strong> : voir tous les paiements<br>
-                    7. <strong>RESET</strong> : admin seulement<br>
-                    8. <strong>Utilisez la barre de recherche</strong> pour trouver des adresses
+                    7. <strong>RESET</strong> : admin seulement
                 </p>
             </div>
         </div>
@@ -1351,12 +1334,9 @@
     <div class="input-group">
         <label for="editAddress">Adresse de la maison</label>
         <div class="address-instructions">
-            <i class="fas fa-info-circle"></i> Exemples :<br>
-            • 2 rue du Soleil<br>
-            • 15 avenue des Champs-Élysées<br>
-            • 8 bis rue de la République
+            <i class="fas fa-info-circle"></i> Adresse détectée depuis vos coordonnées GPS
         </div>
-        <textarea id="editAddress" placeholder="Ex: 2 rue du Soleil, 75000 Paris" rows="2"></textarea>
+        <textarea id="editAddress" placeholder="Détection de l'adresse en cours..." rows="2"></textarea>
     </div>
     
     <div class="input-group">
@@ -1418,7 +1398,6 @@ let currentUser = null;
 let editingMarkerId = null;
 let newHouseData = null;
 let charts = {};
-let geocoder = null;
 let isAddingHouse = false;
 
 // Variables pour la géolocalisation
@@ -1426,6 +1405,7 @@ let userLocationMarker = null;
 let userLocationCircle = null;
 let isTrackingLocation = false;
 let watchId = null;
+let userCurrentLocation = null;
 
 // Email de l'admin (VOUS)
 const ADMIN_EMAIL = "objectifcup@gmail.com";
@@ -1471,84 +1451,69 @@ const CHART_COLORS = {
 const STATUS_ICONS = {};
 for (const [status, color] of Object.entries(STATUS_COLORS)) {
     STATUS_ICONS[status] = L.divIcon({
-        html: `<div style="background-color: ${color}; width: 25px; height: 25px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3);"></div>`,
+        html: `<div style="background-color: ${color}; width: 25px; height: 25px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3); cursor: pointer;"></div>`,
         iconSize: [25, 25],
         iconAnchor: [12, 12],
         className: 'house-marker'
     });
 }
 
-// Liste d'adresses types pour la Bretagne
-const BRITTANY_ADDRESSES = [
-    "Place de la Mairie",
-    "Rue du Port",
-    "Rue de l'Église",
-    "Place du Marché",
-    "Avenue de la Gare",
-    "Rue des Écoles",
-    "Boulevard de la Mer",
-    "Rue du Château",
-    "Place de la Liberté",
-    "Rue du Stade",
-    "Allée des Pommiers",
-    "Chemin de la Forêt",
-    "Impasse du Moulin",
-    "Route de la Plage",
-    "Avenue des Hortensias"
-];
-
-// Liste de noms de rues pour la Bretagne
-const BRITTANY_STREET_NAMES = [
-    "du Goëlo", "d'Armor", "de Cornouaille", "de l'Iroise", "du Morbihan",
-    "des Ajoncs", "du Genêt", "de l'Océan", "des Goélands", "des Mouettes",
-    "de la Rance", "du Blavet", "de la Vilaine", "de l'Elorn", "de l'Aulne",
-    "de Brocéliande", "des Menhirs", "des Dolmens", "des Korrigans",
-    "de la Bigoudène", "du Marin", "du Pêcheur", "du Sabotier", "du Tisserand"
-];
-
 // FONCTIONS UTILITAIRES
 
-// Générer une adresse aléatoire pour la Bretagne
-function generateRandomAddress() {
-    const streetNumber = Math.floor(Math.random() * 99) + 1;
-    const streetType = Math.random() > 0.3 ? "rue" : "avenue";
-    const streetName = BRITTANY_STREET_NAMES[Math.floor(Math.random() * BRITTANY_STREET_NAMES.length)];
-    const city = "Bretagne";
-    
-    // 30% de chance d'avoir un bis/ter
-    let bisTer = "";
-    if (Math.random() > 0.7) {
-        bisTer = " " + (Math.random() > 0.5 ? "bis" : "ter");
+// Géocodage inverse : convertir des coordonnées GPS en adresse
+async function reverseGeocode(lat, lng) {
+    try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`);
+        const data = await response.json();
+        
+        if (data && data.address) {
+            const address = data.address;
+            let formattedAddress = '';
+            
+            // Construction de l'adresse formatée
+            if (address.road) {
+                if (address.house_number) {
+                    formattedAddress = `${address.house_number} ${address.road}`;
+                } else {
+                    formattedAddress = address.road;
+                }
+                
+                if (address.postcode && address.city) {
+                    formattedAddress += `, ${address.postcode} ${address.city}`;
+                } else if (address.town) {
+                    formattedAddress += `, ${address.town}`;
+                } else if (address.village) {
+                    formattedAddress += `, ${address.village}`;
+                }
+            } else if (data.display_name) {
+                // Fallback : utiliser le nom d'affichage complet
+                formattedAddress = data.display_name.split(',')[0];
+                if (data.display_name.length > 100) {
+                    formattedAddress = data.display_name.substring(0, 100) + '...';
+                }
+            }
+            
+            return formattedAddress || `Position: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        }
+    } catch (error) {
+        console.error("Erreur de géocodage inverse:", error);
     }
     
-    return `${streetNumber}${bisTer} ${streetType} ${streetName}, ${city}`;
+    // Fallback si le géocodage échoue
+    return `Position: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
 }
 
-// Géocoder une adresse (transformer une adresse texte en coordonnées GPS)
-function geocodeAddress(address, callback) {
-    if (!geocoder) {
-        console.error("Geocoder non initialisé");
-        return;
+// Fonction pour obtenir l'adresse de la position actuelle de l'utilisateur
+async function getCurrentUserAddress() {
+    if (!userCurrentLocation) return null;
+    
+    try {
+        const address = await reverseGeocode(userCurrentLocation.lat, userCurrentLocation.lng);
+        return address;
+    } catch (error) {
+        console.error("Erreur lors de la récupération de l'adresse:", error);
+        return null;
     }
-    
-    showLoader();
-    
-    geocoder.geocode(address, function(results) {
-        hideLoader();
-        
-        if (results && results.length > 0) {
-            const result = results[0];
-            callback({
-                lat: result.center.lat,
-                lng: result.center.lng,
-                address: result.name || address,
-                fullAddress: result.properties.display_name || address
-            });
-        } else {
-            alert("Adresse non trouvée. Veuillez essayer une adresse plus précise.");
-            callback(null);
-        }
-    });
 }
 
 // Récupérer les initiales d'un pseudo
@@ -1882,7 +1847,7 @@ function updatePaymentsTable(paidHouses) {
     document.getElementById('totalAmount').textContent = totalAmount.toFixed(2) + '€';
 }
 
-// FONCTIONS DE GÉOLOCALISATION
+// FONCTIONS DE GÉOLOCALISATION AMÉLIORÉES
 function locateUser() {
     if (!navigator.geolocation) {
         alert("La géolocalisation n'est pas supportée par votre navigateur");
@@ -1892,24 +1857,39 @@ function locateUser() {
     showLoader();
     
     navigator.geolocation.getCurrentPosition(
-        function(position) {
+        async function(position) {
             const lat = position.coords.latitude;
             const lng = position.coords.longitude;
             const accuracy = position.coords.accuracy;
             
-            if (!isInBrittany(lat, lng)) {
-                hideLoader();
-                if (!confirm("Vous semblez être en dehors de la Bretagne. Voulez-vous quand même centrer la carte sur votre position ?")) {
-                    return;
-                }
-            }
+            // Mettre à jour la position actuelle de l'utilisateur
+            userCurrentLocation = { lat, lng };
             
+            // Centrer sur la position
             map.setView([lat, lng], 16);
             updateUserLocationMarker(lat, lng, accuracy);
+            
+            // Récupérer l'adresse de la position
+            try {
+                const address = await reverseGeocode(lat, lng);
+                if (userLocationMarker) {
+                    userLocationMarker.bindPopup(`
+                        <div style="text-align: center; padding: 5px;">
+                            <strong>Votre position</strong><br>
+                            ${address}<br>
+                            <small>${lat.toFixed(5)}, ${lng.toFixed(5)}</small>
+                        </div>
+                    `).openPopup();
+                }
+            } catch (error) {
+                console.error("Erreur lors de la récupération de l'adresse:", error);
+            }
+            
             hideLoader();
         },
         function(error) {
             hideLoader();
+            
             let errorMessage;
             switch(error.code) {
                 case error.PERMISSION_DENIED:
@@ -1924,12 +1904,13 @@ function locateUser() {
                 default:
                     errorMessage = "Une erreur inconnue est survenue.";
             }
+            
             alert("Erreur de géolocalisation : " + errorMessage);
         },
         {
             enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 0
+            timeout: 15000,
+            maximumAge: 60000
         }
     );
 }
@@ -1941,20 +1922,28 @@ function toggleLocationTracking() {
     }
     
     if (isTrackingLocation) {
+        // Arrêter le suivi
         navigator.geolocation.clearWatch(watchId);
         isTrackingLocation = false;
         document.getElementById('btnTrack').innerHTML = '<i class="fas fa-satellite"></i> Suivre';
+        
+        console.log("📍 Suivi de position arrêté");
     } else {
+        // Démarrer le suivi
         showLoader();
         
         watchId = navigator.geolocation.watchPosition(
-            function(position) {
+            async function(position) {
                 const lat = position.coords.latitude;
                 const lng = position.coords.longitude;
                 const accuracy = position.coords.accuracy;
                 
+                // Mettre à jour la position actuelle
+                userCurrentLocation = { lat, lng };
+                
                 updateUserLocationMarker(lat, lng, accuracy);
                 
+                // Si c'est la première position, centrer la carte
                 if (!isTrackingLocation) {
                     map.setView([lat, lng], 16);
                 }
@@ -1965,20 +1954,23 @@ function toggleLocationTracking() {
             },
             function(error) {
                 hideLoader();
+                console.error("❌ Erreur de suivi:", error);
+                
                 if (error.code === error.PERMISSION_DENIED) {
                     alert("Permission de géolocalisation refusée. Activez-la dans les paramètres.");
                 }
             },
             {
                 enableHighAccuracy: true,
-                maximumAge: 10000,
-                timeout: 5000
+                maximumAge: 30000,
+                timeout: 10000
             }
         );
     }
 }
 
 function updateUserLocationMarker(lat, lng, accuracy) {
+    // Supprimer l'ancien marqueur s'il existe
     if (userLocationMarker) {
         map.removeLayer(userLocationMarker);
     }
@@ -1986,8 +1978,9 @@ function updateUserLocationMarker(lat, lng, accuracy) {
         map.removeLayer(userLocationCircle);
     }
     
+    // Créer un marqueur personnalisé pour la position de l'utilisateur
     const userIcon = L.divIcon({
-        html: `<div class="user-location-marker user-location-pulse">
+        html: `<div class="user-location-marker">
                   <i class="fas fa-user" style="color: white; font-size: 10px;"></i>
                </div>`,
         iconSize: [20, 20],
@@ -1995,31 +1988,19 @@ function updateUserLocationMarker(lat, lng, accuracy) {
         className: 'user-location-icon'
     });
     
+    // Ajouter le marqueur
     userLocationMarker = L.marker([lat, lng], {
         icon: userIcon,
         zIndexOffset: 1000
     }).addTo(map);
     
-    if (accuracy < 1000) {
-        userLocationCircle = L.circle([lat, lng], {
-            color: '#2196F3',
-            fillColor: '#2196F3',
-            fillOpacity: 0.1,
-            radius: accuracy
-        }).addTo(map);
-    }
-    
+    // Ajouter un popup d'information
     userLocationMarker.bindPopup(`
         <div style="text-align: center; padding: 5px;">
             <strong>Votre position</strong><br>
-            Précision: ${Math.round(accuracy)} mètres<br>
             <small>${lat.toFixed(5)}, ${lng.toFixed(5)}</small>
         </div>
     `);
-}
-
-function isInBrittany(lat, lng) {
-    return lat >= 47.0 && lat <= 49.0 && lng >= -5.0 && lng <= -1.0;
 }
 
 function showLoader() {
@@ -2064,14 +2045,20 @@ function updateRanking() {
 
 // INITIALISATION DE LA CARTE
 function initMap() {
-    console.log("🗺️ Initialisation de la carte de Bretagne...");
+    console.log("🗺️ Initialisation de la carte...");
     
     if (map) {
         map.remove();
     }
     
     map = L.map('map');
-    map.setView([48.2020, -2.9326], 9);
+    
+    // Si on a la position de l'utilisateur, centrer dessus, sinon sur la Bretagne
+    if (userCurrentLocation) {
+        map.setView([userCurrentLocation.lat, userCurrentLocation.lng], 16);
+    } else {
+        map.setView([48.2020, -2.9326], 9);
+    }
     
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap',
@@ -2079,45 +2066,22 @@ function initMap() {
         minZoom: 8
     }).addTo(map);
     
-    const bounds = L.latLngBounds(
-        [47.0, -5.0],
-        [49.0, -1.0]
-    );
-    
-    if (window.innerWidth > 768) {
-        map.setMaxBounds(bounds);
-    }
-    
-    // Ajouter le geocoder (recherche d'adresse)
-    geocoder = L.Control.geocoder({
-        defaultMarkGeocode: false,
-        placeholder: "Rechercher une adresse...",
-        errorMessage: "Adresse non trouvée"
-    }).addTo(map);
-    
-    // Événement quand une adresse est trouvée
-    geocoder.on('markgeocode', function(e) {
-        const center = e.geocode.center;
-        const address = e.geocode.name;
+    // Gérer le clic sur la carte pour ajouter des maisons
+    map.on('click', async function(e) {
+        if (!currentUser) return;
         
-        map.setView(center, 16);
+        console.log("📍 Clic sur la carte à:", e.latlng.lat, e.latlng.lng);
         
-        // Si on est en mode ajout de maison, pré-remplir l'adresse
-        if (isAddingHouse) {
-            document.getElementById('editAddress').value = address;
-            newHouseData = {
-                lat: center.lat,
-                lng: center.lng,
-                address: address
-            };
+        // Géocoder l'adresse à partir des coordonnées
+        showLoader();
+        try {
+            const address = await reverseGeocode(e.latlng.lat, e.latlng.lng);
+            hideLoader();
+            showPaymentPopup(e.latlng.lat, e.latlng.lng, address);
+        } catch (error) {
+            hideLoader();
+            alert("Impossible de récupérer l'adresse. Veuillez réessayer.");
         }
-    });
-    
-    // Désactiver le clic sur la carte pour ajouter des maisons
-    // (on utilise maintenant le bouton "Ajouter une maison")
-    map.on('click', function(e) {
-        // On ne fait rien au clic sur la carte
-        // L'ajout se fait via le bouton et la géolocalisation
     });
     
     setTimeout(() => {
@@ -2126,25 +2090,38 @@ function initMap() {
 }
 
 // FONCTIONS POUR LE POPUP DE PAIEMENT
-function showPaymentPopup(lat, lng, address) {
-    // Si on a une adresse, l'utiliser, sinon générer une adresse aléatoire
-    const defaultAddress = address || generateRandomAddress();
+async function showPaymentPopup(lat, lng, address = null) {
+    // Si aucune adresse n'est fournie, la géocoder
+    let finalAddress = address;
+    if (!finalAddress) {
+        showLoader();
+        try {
+            finalAddress = await reverseGeocode(lat, lng);
+            hideLoader();
+        } catch (error) {
+            hideLoader();
+            finalAddress = `Position: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        }
+    }
     
     newHouseData = {
         lat: lat,
         lng: lng,
-        address: defaultAddress
+        address: finalAddress
     };
     
-    document.getElementById('editAddress').value = defaultAddress;
+    // Pré-remplir le formulaire
+    document.getElementById('editAddress').value = finalAddress;
     document.getElementById('paymentAmount').value = '';
     document.getElementById('additionalNote').value = '';
     
+    // Réinitialiser les boutons radio
     const paymentMethods = document.getElementsByName('paymentMethod');
     paymentMethods.forEach(method => {
         method.checked = false;
     });
     
+    // Afficher le popup
     document.getElementById('paymentPopup').style.display = 'block';
     isAddingHouse = true;
 }
@@ -2155,7 +2132,7 @@ function hidePaymentPopup() {
     isAddingHouse = false;
 }
 
-function savePaymentInfo() {
+async function savePaymentInfo() {
     if (!newHouseData) return;
     
     const address = document.getElementById('editAddress').value.trim();
@@ -2163,6 +2140,7 @@ function savePaymentInfo() {
     const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked');
     const additionalNote = document.getElementById('additionalNote').value.trim();
     
+    // Validation
     if (!address) {
         alert("Veuillez saisir une adresse");
         return;
@@ -2178,39 +2156,20 @@ function savePaymentInfo() {
         return;
     }
     
-    // Si l'adresse a changé, géocoder la nouvelle adresse
-    if (address !== newHouseData.address) {
-        showLoader();
-        geocodeAddress(address, function(result) {
-            hideLoader();
-            
-            if (result) {
-                // Utiliser les nouvelles coordonnées
-                newHouseData.lat = result.lat;
-                newHouseData.lng = result.lng;
-                newHouseData.address = result.address;
-                createHouseWithPayment(amount, paymentMethod.value, additionalNote);
-            }
-        });
-    } else {
-        // Utiliser les coordonnées existantes
-        createHouseWithPayment(amount, paymentMethod.value, additionalNote);
-    }
-}
-
-function createHouseWithPayment(amount, paymentMethod, additionalNote) {
+    // Créer un ID unique
     const id = 'house_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     
+    // Créer la maison
     const house = {
         id: id,
         lat: newHouseData.lat,
         lng: newHouseData.lng,
-        address: newHouseData.address,
+        address: address,
         status: STATUS.BOUGHT,
         note: additionalNote,
         payment: {
             amount: amount,
-            method: paymentMethod,
+            method: paymentMethod.value,
             date: new Date().toISOString()
         },
         createdBy: currentUser.email,
@@ -2218,14 +2177,26 @@ function createHouseWithPayment(amount, paymentMethod, additionalNote) {
         updatedAt: new Date().toISOString()
     };
     
+    // Ajouter à la liste
     houses.push(house);
+    
+    // Sauvegarder
     saveHouses();
+    
+    // Ajouter le marqueur
     addMarker(house);
+    
+    // Mettre à jour les statistiques
     updateStats();
+    
+    // Mettre à jour le classement
     updateRanking();
+    
+    // Cacher le popup
     hidePaymentPopup();
     
-    alert(`Maison ajoutée avec succès !\nAdresse: ${newHouseData.address}\nMontant: ${amount}€\nMoyen de paiement: ${paymentMethod}`);
+    console.log("✅ Maison ajoutée avec paiement:", house);
+    alert(`Maison ajoutée avec succès !\nAdresse: ${address}\nMontant: ${amount}€\nMoyen de paiement: ${paymentMethod.value}`);
 }
 
 // GESTION DES MAISONS
@@ -2256,34 +2227,36 @@ function updateHouseNote(id, newNote) {
     }
 }
 
-function updateHouseAddress(id, newAddress) {
+async function updateHouseAddress(id, newAddress) {
     const house = houses.find(h => h.id === id);
     if (house) {
-        // Géocoder la nouvelle adresse
-        showLoader();
-        geocodeAddress(newAddress, function(result) {
-            hideLoader();
-            
-            if (result) {
-                house.address = result.address;
-                house.lat = result.lat;
-                house.lng = result.lng;
-                house.updatedAt = new Date().toISOString();
-                updateMarker(house);
-                saveHouses();
-                
-                // Recharger le popup
-                const marker = markers.get(id);
-                if (marker) {
-                    marker.closePopup();
-                    setTimeout(() => {
-                        marker.openPopup();
-                    }, 100);
-                }
-            } else {
-                alert("Adresse non trouvée. Veuillez essayer une adresse plus précise.");
+        house.address = newAddress;
+        house.updatedAt = new Date().toISOString();
+        
+        // Si l'adresse a changé, essayer de géocoder pour mettre à jour les coordonnées
+        if (newAddress !== house.address) {
+            showLoader();
+            try {
+                // Ici on pourrait implémenter un géocodage direct (adresse -> coordonnées)
+                // Pour l'instant on garde les coordonnées existantes
+                hideLoader();
+            } catch (error) {
+                hideLoader();
+                console.error("Erreur lors de la mise à jour des coordonnées:", error);
             }
-        });
+        }
+        
+        updateMarker(house);
+        saveHouses();
+        
+        // Recharger le popup
+        const marker = markers.get(id);
+        if (marker) {
+            marker.closePopup();
+            setTimeout(() => {
+                marker.openPopup();
+            }, 100);
+        }
         return true;
     }
     return false;
@@ -2315,7 +2288,8 @@ function addMarker(house) {
     markers.set(house.id, marker);
     
     marker.bindPopup(createPopupContent(house), {
-        maxWidth: 300
+        maxWidth: 300,
+        closeOnClick: false
     });
     
     marker.getElement().classList.add('new-house');
@@ -2328,9 +2302,12 @@ function addMarker(house) {
             statusButtons.forEach(btn => {
                 btn.addEventListener('click', function(e) {
                     e.stopPropagation();
+                    e.preventDefault();
                     const houseId = this.getAttribute('data-id');
                     const newStatus = this.getAttribute('data-status');
+                    
                     updateHouseStatus(houseId, newStatus);
+                    
                     marker.closePopup();
                     setTimeout(() => {
                         marker.openPopup();
@@ -2342,7 +2319,9 @@ function addMarker(house) {
             if (deleteBtn) {
                 deleteBtn.addEventListener('click', function(e) {
                     e.stopPropagation();
+                    e.preventDefault();
                     const houseId = this.getAttribute('data-id');
+                    
                     if (confirm('Voulez-vous vraiment supprimer cette maison ?')) {
                         deleteHouse(houseId);
                     }
@@ -2353,6 +2332,7 @@ function addMarker(house) {
             if (editNoteBtn) {
                 editNoteBtn.addEventListener('click', function(e) {
                     e.stopPropagation();
+                    e.preventDefault();
                     const houseId = this.getAttribute('data-id');
                     editNote(houseId);
                 });
@@ -2362,11 +2342,17 @@ function addMarker(house) {
             if (editAddressBtn) {
                 editAddressBtn.addEventListener('click', function(e) {
                     e.stopPropagation();
+                    e.preventDefault();
                     const houseId = this.getAttribute('data-id');
-                    editAddressPopup(houseId);
+                    editAddress(houseId);
                 });
             }
         }, 10);
+    });
+    
+    marker.on('click', function(e) {
+        e.originalEvent.stopPropagation();
+        marker.openPopup();
     });
 }
 
@@ -2405,6 +2391,9 @@ function createPopupContent(house) {
     return `
         <div class="popup-content">
             <div class="popup-address">${house.address}</div>
+            <div class="popup-coordinates">
+                <i class="fas fa-map-marker-alt"></i> ${house.lat.toFixed(5)}, ${house.lng.toFixed(5)}
+            </div>
             <div style="font-size: 12px; color: #666; margin-bottom: 5px;">
                 <i class="fas fa-user"></i> Ajouté par ${creatorName}
             </div>
@@ -2446,7 +2435,7 @@ function createPopupContent(house) {
 }
 
 // ÉDITION D'ADRESSE
-function editAddressPopup(houseId) {
+function editAddress(houseId) {
     const house = houses.find(h => h.id === houseId);
     if (house) {
         const newAddress = prompt("Modifier l'adresse:", house.address);
@@ -2587,6 +2576,7 @@ function logout() {
     }
     
     currentUser = null;
+    userCurrentLocation = null;
     
     document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
@@ -2619,32 +2609,12 @@ function resetAllHouses() {
 }
 
 // FONCTION POUR AJOUTER UNE MAISON
-function addNewHouse() {
+async function addNewHouse() {
     if (!currentUser) return;
     
-    // Demander si on veut utiliser la position actuelle
-    if (navigator.geolocation && confirm("Voulez-vous utiliser votre position actuelle pour placer la maison ?")) {
-        showLoader();
-        
-        navigator.geolocation.getCurrentPosition(
-            function(position) {
-                const lat = position.coords.latitude;
-                const lng = position.coords.longitude;
-                
-                hideLoader();
-                showPaymentPopup(lat, lng);
-            },
-            function(error) {
-                hideLoader();
-                // Si la géolocalisation échoue, utiliser le centre de la carte
-                const center = map.getCenter();
-                showPaymentPopup(center.lat, center.lng);
-            }
-        );
-    } else {
-        // Utiliser le centre de la carte
-        const center = map.getCenter();
-        showPaymentPopup(center.lat, center.lng);
+    if (confirm("Cliquez sur la carte à l'endroit où vous souhaitez ajouter une maison.\n\nL'adresse sera détectée automatiquement depuis les coordonnées GPS.")) {
+        isAddingHouse = true;
+        alert("Mode ajout activé. Cliquez sur la carte pour placer la maison.");
     }
 }
 
