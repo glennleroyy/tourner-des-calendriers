@@ -13,6 +13,10 @@
     
     <!-- Chart.js pour les graphiques -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Firebase (mode réseau / multi-utilisateurs) -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
     
     <style>
         /* Style général */
@@ -974,6 +978,114 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #b71c1c;
         }
+
+        /* ===== Ajouts : réseau / admin / secteurs / immeubles ===== */
+        .sync-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+        .sync-badge.online { background: #c8e6c9; color: #2e7d32; }
+        .sync-badge.offline { background: #ffe0b2; color: #e65100; }
+
+        .zone-badge {
+            display: inline-block;
+            background: #d32f2f;
+            color: white;
+            font-size: 11px;
+            font-weight: bold;
+            padding: 3px 8px;
+            border-radius: 10px;
+            margin-left: 5px;
+        }
+        .zone-badge.none { background: #9e9e9e; }
+
+        .admin-user-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 6px;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+        }
+        .admin-user-row .au-name { font-weight: bold; flex: 1 1 100%; }
+        .admin-user-row .au-email { color: #888; font-size: 11px; flex: 1 1 100%; }
+        .admin-user-row input.au-zone {
+            flex: 1;
+            min-width: 90px;
+            padding: 5px 7px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 12px;
+        }
+        .admin-user-row button {
+            font-size: 11px;
+            padding: 5px 8px;
+        }
+        .btn-admin-toggle { background-color: #607d8b; }
+        .btn-zone-save { background-color: #4CAF50; }
+
+        .my-zone-box {
+            background: #fff3e0;
+            border: 1px solid #ffcc80;
+            border-radius: 6px;
+            padding: 8px 10px;
+            font-size: 13px;
+            margin-bottom: 10px;
+        }
+
+        .house-type-select {
+            width: 100%;
+            padding: 6px;
+            margin: 6px 0;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            font-size: 13px;
+        }
+
+        .purchases-list {
+            margin: 6px 0;
+            max-height: 140px;
+            overflow-y: auto;
+        }
+        .purchase-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f5f5f5;
+            border-radius: 5px;
+            padding: 5px 8px;
+            margin-bottom: 4px;
+            font-size: 12px;
+        }
+        .purchase-item .pi-del {
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            width: 20px;
+            height: 20px;
+            font-size: 11px;
+            cursor: pointer;
+            padding: 0;
+        }
+        .btn-add-purchase {
+            background-color: #4CAF50;
+            width: 100%;
+            justify-content: center;
+            margin-top: 4px;
+        }
+        .admin-danger-zone {
+            border-top: 2px dashed #f44336;
+            margin-top: 10px;
+            padding-top: 10px;
+        }
+        .admin-danger-zone button { width: 100%; margin-bottom: 8px; justify-content: center; }
     </style>
 </head>
 <body>
@@ -1055,12 +1167,10 @@
             <button id="btnTrack" class="btn-track">
                 <i class="fas fa-satellite"></i> Suivre
             </button>
+            <span id="syncBadge" class="sync-badge offline"><i class="fas fa-plug"></i> Local</span>
             <span id="userPseudo"></span>
             <button id="btnLogout" class="btn-logout">
                 <i class="fas fa-sign-out-alt"></i> Déconnexion
-            </button>
-            <button id="btnReset" class="btn-reset" style="display: none;">
-                <i class="fas fa-trash"></i> Reset
             </button>
         </div>
     </div>
@@ -1124,16 +1234,39 @@
                 </div>
             </div>
             
+            <div class="section" id="myZoneSection" style="display:none;">
+                <h3><i class="fas fa-map-marked-alt"></i> Mon secteur</h3>
+                <div class="my-zone-box" id="myZoneBox">Aucun secteur attribué</div>
+            </div>
+
+            <div class="section" id="adminSection" style="display:none;">
+                <h3><i class="fas fa-user-shield"></i> Administration</h3>
+                <p style="font-size:12px;color:#777;margin-bottom:8px;">
+                    Attribuez un secteur de distribution à chaque personne connectée, ou donnez-lui les droits admin.
+                </p>
+                <div id="adminUserList"></div>
+
+                <div class="admin-danger-zone">
+                    <button id="btnResetSeason" style="background-color:#ff9800;">
+                        <i class="fas fa-redo"></i> Nouvelle saison (repasser tous les points en gris)
+                    </button>
+                    <button id="btnReset" class="btn-reset">
+                        <i class="fas fa-trash"></i> Tout réinitialiser (utilisateurs + maisons)
+                    </button>
+                </div>
+            </div>
+
             <div class="section">
                 <h3><i class="fas fa-info-circle"></i> Instructions</h3>
                 <p style="font-size: 13px; line-height: 1.4; color: #555;">
                     1. <strong>Cliquez sur une maison</strong> pour changer son statut<br>
-                    2. <strong>Bouton "Ajouter une maison"</strong> : pour ajouter une nouvelle maison<br>
+                    2. <strong>Bouton "Ajouter une maison"</strong> : place directement un point à votre position GPS<br>
                     3. <strong>Bouton "Ma position"</strong> : vous localise sur la carte<br>
                     4. <strong>Bouton "Suivre"</strong> : suit votre déplacement<br>
                     5. <strong>Classement</strong> : 10pts acheté, 5pts absent, 1pt non acheté, 0pt non passé<br>
                     6. <strong>Statistiques</strong> : voir tous les paiements<br>
-                    7. <strong>RESET</strong> : admin seulement
+                    7. <strong>Immeuble</strong> : dans la fiche d'un point, choisissez "Immeuble" pour enregistrer plusieurs achats à la même adresse<br>
+                    8. <strong>Administration</strong> : réservée à l'administrateur
                 </p>
             </div>
         </div>
@@ -1234,7 +1367,7 @@
 
 <!-- Popup de paiement -->
 <div id="paymentPopup" class="payment-popup">
-    <h3><i class="fas fa-euro-sign"></i> Informations de paiement</h3>
+    <h3 id="paymentPopupTitle"><i class="fas fa-euro-sign"></i> Informations de paiement</h3>
     
     <div class="input-group">
         <label for="editAddress">Adresse de la maison</label>
@@ -1242,6 +1375,11 @@
             <i class="fas fa-info-circle"></i> Adresse détectée depuis les coordonnées GPS
         </div>
         <textarea id="editAddress" placeholder="Détection de l'adresse en cours..." rows="2"></textarea>
+    </div>
+
+    <div class="input-group" id="purchaseLabelGroup" style="display:none;">
+        <label for="purchaseLabel">Appartement / étage concerné</label>
+        <input type="text" id="purchaseLabel" placeholder="Ex: 3ème étage porte gauche">
     </div>
     
     <div class="input-group">
@@ -1312,12 +1450,143 @@ let isTrackingLocation = false;
 let watchId = null;
 let userCurrentLocation = null;
 
-// Email de l'admin
+// Email de l'admin "de base" (aura toujours le rôle admin au premier lancement)
 const ADMIN_EMAIL = "objectifcup@gmail.com";
 
-// Données (stockage local)
-let houses = JSON.parse(localStorage.getItem('calentour_houses')) || [];
-let users = JSON.parse(localStorage.getItem('calentour_users')) || [];
+// Types de points
+const HOUSE_TYPE = {
+    HOUSE: 'maison',
+    BUILDING: 'immeuble'
+};
+
+let purchaseMode = false; // true = le popup de paiement sert à ajouter un achat sur un immeuble
+
+// ==================================================================
+// MODE RÉSEAU (Firebase Realtime Database)
+// ==================================================================
+// Pour activer le partage des points entre TOUS les utilisateurs :
+// 1. Créez un projet gratuit sur https://console.firebase.google.com
+// 2. Activez "Realtime Database" (démarrer en mode test)
+// 3. Copiez la config de votre projet ci-dessous (Paramètres du projet > Vos applications > Config)
+// Tant que ce n'est pas rempli, l'application fonctionne en local uniquement
+// (chaque appareil a ses propres données, comme avant).
+const firebaseConfig = {
+    apiKey: "VOTRE_API_KEY",
+    authDomain: "VOTRE_PROJET.firebaseapp.com",
+    databaseURL: "https://VOTRE_PROJET-default-rtdb.firebaseio.com",
+    projectId: "VOTRE_PROJET",
+    storageBucket: "VOTRE_PROJET.appspot.com",
+    messagingSenderId: "000000000000",
+    appId: "VOTRE_APP_ID"
+};
+
+let db = null;
+let firebaseReady = false;
+
+function initFirebase() {
+    try {
+        if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "VOTRE_API_KEY") {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.database();
+            firebaseReady = true;
+        }
+    } catch (e) {
+        console.warn("Firebase non disponible, mode local uniquement:", e);
+        firebaseReady = false;
+    }
+    updateSyncBadge();
+}
+
+function updateSyncBadge() {
+    const badge = document.getElementById('syncBadge');
+    if (!badge) return;
+    if (firebaseReady) {
+        badge.className = 'sync-badge online';
+        badge.innerHTML = '<i class="fas fa-wifi"></i> En réseau';
+    } else {
+        badge.className = 'sync-badge offline';
+        badge.innerHTML = '<i class="fas fa-plug"></i> Local';
+    }
+}
+
+// Les clés Firebase ne peuvent pas contenir . # $ [ ]
+function emailKey(email) {
+    return email.replace(/\./g, ',').replace(/[#$\[\]]/g, '_');
+}
+
+// Écrit UNE maison à distance (évite d'écraser le travail des autres)
+function syncHouseRemote(house) {
+    if (firebaseReady) {
+        db.ref('houses/' + house.id).set(house).catch(e => console.error(e));
+    }
+}
+
+function deleteHouseRemote(id) {
+    if (firebaseReady) {
+        db.ref('houses/' + id).remove().catch(e => console.error(e));
+    }
+}
+
+function syncUserRemote(user) {
+    if (firebaseReady) {
+        db.ref('users/' + emailKey(user.email)).set(user).catch(e => console.error(e));
+    }
+}
+
+// Rend une maison "fraîche" (valeurs par défaut pour les anciennes données)
+function normalizeHouse(h) {
+    return Object.assign({
+        type: HOUSE_TYPE.HOUSE,
+        purchases: [],
+        note: '',
+        zone: null
+    }, h);
+}
+
+function normalizeUser(u) {
+    return Object.assign({
+        role: (u.email === ADMIN_EMAIL) ? 'admin' : 'user',
+        zone: null,
+        lastLogin: null
+    }, u, {
+        role: u.role ? u.role : (u.email === ADMIN_EMAIL ? 'admin' : 'user')
+    });
+}
+
+// Branche l'écoute temps réel : dès qu'un autre utilisateur ajoute/modifie un point
+// ou qu'un admin attribue un secteur, tout le monde voit la mise à jour automatiquement.
+function listenRemote() {
+    if (!firebaseReady) return;
+
+    db.ref('houses').on('value', snapshot => {
+        const val = snapshot.val() || {};
+        houses = Object.values(val).map(normalizeHouse);
+        saveHouses();
+        if (map) renderAllMarkers();
+        updateStats();
+        updateRanking();
+    });
+
+    db.ref('users').on('value', snapshot => {
+        const val = snapshot.val() || {};
+        users = Object.values(val).map(normalizeUser);
+        saveUsers();
+        renderAdminPanel();
+        renderMyZone();
+        updateRanking();
+    });
+}
+
+// Redessine tous les marqueurs (utilisé après une mise à jour reçue du réseau)
+function renderAllMarkers() {
+    markers.forEach(marker => map.removeLayer(marker));
+    markers.clear();
+    houses.forEach(house => addMarker(house));
+}
+
+// Données (stockage local, mis à jour ensuite par le réseau si disponible)
+let houses = (JSON.parse(localStorage.getItem('calentour_houses')) || []).map(normalizeHouse);
+let users = (JSON.parse(localStorage.getItem('calentour_users')) || []).map(normalizeUser);
 
 // Système de points
 const POINTS = {
@@ -1407,6 +1676,35 @@ function calculateUserScore(email) {
     return userHouses.reduce((total, house) => total + (POINTS[house.status] || 0), 0);
 }
 
+// Construit la liste de toutes les transactions (paiements "maison" + achats "immeuble")
+function getAllTransactions() {
+    const transactions = [];
+    houses.forEach(house => {
+        if (house.type === HOUSE_TYPE.BUILDING) {
+            (house.purchases || []).forEach(p => {
+                transactions.push({
+                    amount: p.amount,
+                    method: p.method,
+                    createdBy: house.createdBy,
+                    createdAt: p.date || house.createdAt,
+                    address: house.address + (p.label ? ` (${p.label})` : ''),
+                    note: p.note || house.note || ''
+                });
+            });
+        } else if (house.payment && house.status === STATUS.BOUGHT) {
+            transactions.push({
+                amount: house.payment.amount,
+                method: house.payment.method,
+                createdBy: house.createdBy,
+                createdAt: house.payment.date || house.createdAt,
+                address: house.address,
+                note: house.note || ''
+            });
+        }
+    });
+    return transactions;
+}
+
 // Calculer tous les scores
 function calculateAllScores() {
     const scores = {};
@@ -1478,7 +1776,7 @@ function hideChartScreen() {
 }
 
 function updateCharts() {
-    const paidHouses = houses.filter(house => house.payment && house.status === STATUS.BOUGHT);
+    const paidHouses = getAllTransactions();
     
     if (paidHouses.length === 0) {
         document.getElementById('paymentsTable').innerHTML = 
@@ -1488,9 +1786,8 @@ function updateCharts() {
     
     // 1. Répartition des moyens de paiement
     const paymentMethods = {};
-    paidHouses.forEach(house => {
-        const method = house.payment.method;
-        paymentMethods[method] = (paymentMethods[method] || 0) + 1;
+    paidHouses.forEach(t => {
+        paymentMethods[t.method] = (paymentMethods[t.method] || 0) + 1;
     });
     
     // 2. Répartition des montants
@@ -1501,8 +1798,8 @@ function updateCharts() {
         '10€+': { min: 10, max: Infinity, count: 0, total: 0 }
     };
     
-    paidHouses.forEach(house => {
-        const amount = house.payment.amount;
+    paidHouses.forEach(t => {
+        const amount = t.amount;
         for (const [range, data] of Object.entries(amountRanges)) {
             if (amount >= data.min && amount < data.max) {
                 data.count++;
@@ -1514,10 +1811,10 @@ function updateCharts() {
     
     // 3. Top utilisateurs par recettes
     const userRevenue = {};
-    paidHouses.forEach(house => {
-        const user = users.find(u => u.email === house.createdBy);
+    paidHouses.forEach(t => {
+        const user = users.find(u => u.email === t.createdBy);
         const userName = user ? user.pseudo : 'Inconnu';
-        userRevenue[userName] = (userRevenue[userName] || 0) + house.payment.amount;
+        userRevenue[userName] = (userRevenue[userName] || 0) + t.amount;
     });
     
     const topUsers = Object.entries(userRevenue)
@@ -1526,12 +1823,12 @@ function updateCharts() {
     
     // 4. Évolution des ventes par date
     const salesByDate = {};
-    paidHouses.forEach(house => {
-        const date = new Date(house.createdAt).toLocaleDateString('fr-FR', { 
+    paidHouses.forEach(t => {
+        const date = new Date(t.createdAt).toLocaleDateString('fr-FR', { 
             day: '2-digit', 
             month: 'short' 
         });
-        salesByDate[date] = (salesByDate[date] || 0) + house.payment.amount;
+        salesByDate[date] = (salesByDate[date] || 0) + t.amount;
     });
     
     // Créer ou mettre à jour les graphiques
@@ -1688,25 +1985,25 @@ function updatePaymentsTable(paidHouses) {
     
     paidHouses.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     
-    paidHouses.forEach(house => {
-        const user = users.find(u => u.email === house.createdBy);
+    paidHouses.forEach(t => {
+        const user = users.find(u => u.email === t.createdBy);
         const userName = user ? user.pseudo : 'Inconnu';
-        const date = new Date(house.createdAt).toLocaleDateString('fr-FR', {
+        const date = new Date(t.createdAt).toLocaleDateString('fr-FR', {
             day: '2-digit',
             month: '2-digit',
             year: 'numeric'
         });
-        const amount = house.payment.amount.toFixed(2);
-        totalAmount += house.payment.amount;
+        const amount = t.amount.toFixed(2);
+        totalAmount += t.amount;
         
         html += `
             <tr>
                 <td>${date}</td>
                 <td>${userName}</td>
-                <td style="max-width: 200px; word-wrap: break-word;">${house.address}</td>
+                <td style="max-width: 200px; word-wrap: break-word;">${t.address}</td>
                 <td><strong>${amount}€</strong></td>
-                <td>${house.payment.method}</td>
-                <td style="max-width: 150px; word-wrap: break-word;">${house.note || '-'}</td>
+                <td>${t.method}</td>
+                <td style="max-width: 150px; word-wrap: break-word;">${t.note || '-'}</td>
             </tr>
         `;
     });
@@ -1878,21 +2175,104 @@ function updateStats() {
     document.getElementById('statNotBought').textContent = userHouses.filter(h => h.status === STATUS.NOT_BOUGHT).length;
     document.getElementById('statAbsent').textContent = userHouses.filter(h => h.status === STATUS.ABSENT).length;
     
-    // Afficher/masquer le bouton reset pour l'admin
-    if (currentUser.email === ADMIN_EMAIL) {
-        document.getElementById('btnReset').style.display = 'flex';
-    } else {
-        document.getElementById('btnReset').style.display = 'none';
+    // Afficher/masquer le panneau admin
+    const isAdmin = currentUser.role === 'admin' || currentUser.email === ADMIN_EMAIL;
+    document.getElementById('adminSection').style.display = isAdmin ? 'block' : 'none';
+    if (isAdmin) renderAdminPanel();
+}
+
+// ==================================================================
+// PANNEAU ADMINISTRATEUR : secteurs + gestion des rôles
+// ==================================================================
+function renderAdminPanel() {
+    if (!currentUser) return;
+    const isAdmin = currentUser.role === 'admin' || currentUser.email === ADMIN_EMAIL;
+    if (!isAdmin) return;
+
+    const container = document.getElementById('adminUserList');
+    if (!container) return;
+
+    if (users.length === 0) {
+        container.innerHTML = '<p style="color:#888;font-size:12px;">Aucun utilisateur inscrit pour le moment.</p>';
+        return;
     }
+
+    let html = '';
+    users.slice().sort((a, b) => a.pseudo.localeCompare(b.pseudo)).forEach(u => {
+        const lastSeen = u.lastLogin ? new Date(u.lastLogin).toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}) : 'jamais connecté';
+        const isUserAdmin = u.role === 'admin';
+        html += `
+            <div class="admin-user-row">
+                <div class="au-name">${u.pseudo} ${isUserAdmin ? '<span class="zone-badge">ADMIN</span>' : ''}</div>
+                <div class="au-email">${u.email} · dernière connexion : ${lastSeen}</div>
+                <input type="text" class="au-zone" placeholder="Secteur (ex: Rue du centre)" value="${u.zone ? u.zone.replace(/"/g,'&quot;') : ''}" id="zoneInput_${emailKey(u.email)}">
+                <button class="btn-zone-save" onclick="window.assignZone('${u.email}')"><i class="fas fa-save"></i></button>
+                ${u.email !== ADMIN_EMAIL ? `<button class="btn-admin-toggle" onclick="window.toggleAdminRole('${u.email}')">${isUserAdmin ? 'Retirer admin' : 'Rendre admin'}</button>` : ''}
+            </div>
+        `;
+    });
+    container.innerHTML = html;
+}
+
+function assignZone(email) {
+    const user = users.find(u => u.email === email);
+    if (!user) return;
+    const input = document.getElementById('zoneInput_' + emailKey(email));
+    const zone = input ? input.value.trim() : '';
+    user.zone = zone || null;
+    saveUsers();
+    syncUserRemote(user);
+    if (currentUser && currentUser.email === email) {
+        currentUser.zone = user.zone;
+        renderMyZone();
+    }
+    alert(`Secteur "${user.zone || 'aucun'}" attribué à ${user.pseudo}.`);
+}
+
+function toggleAdminRole(email) {
+    const user = users.find(u => u.email === email);
+    if (!user) return;
+    user.role = (user.role === 'admin') ? 'user' : 'admin';
+    saveUsers();
+    syncUserRemote(user);
+    renderAdminPanel();
+}
+
+function renderMyZone() {
+    if (!currentUser) return;
+    const section = document.getElementById('myZoneSection');
+    const box = document.getElementById('myZoneBox');
+    if (!section || !box) return;
+    section.style.display = 'block';
+    box.innerHTML = currentUser.zone
+        ? `<i class="fas fa-map-marker-alt"></i> Secteur attribué : <span class="zone-badge">${currentUser.zone}</span>`
+        : `Aucun secteur attribué pour l'instant. Voyez avec l'administrateur.`;
+}
+
+// Icône du marqueur : rond = maison, carré = immeuble
+function getHouseIcon(house) {
+    const color = STATUS_COLORS[house.status];
+    const isBuilding = house.type === HOUSE_TYPE.BUILDING;
+    const radius = isBuilding ? '4px' : '50%';
+    const badge = isBuilding && (house.purchases || []).length > 0
+        ? `<div style="position:absolute; top:-6px; right:-6px; background:#d32f2f; color:white; font-size:9px; font-weight:bold; border-radius:8px; padding:1px 4px; line-height:1.2;">${house.purchases.length}</div>`
+        : '';
+    return L.divIcon({
+        html: `<div style="position:relative;"><div style="background-color: ${color}; width: 25px; height: 25px; border-radius: ${radius}; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3); cursor: pointer;"></div>${badge}</div>`,
+        iconSize: [25, 25],
+        iconAnchor: [12, 12],
+        className: 'house-marker'
+    });
 }
 
 // Créer le contenu du popup
 function createPopupContent(house) {
     const user = users.find(u => u.email === house.createdBy);
     const userName = user ? user.pseudo : 'Inconnu';
+    const isBuilding = house.type === HOUSE_TYPE.BUILDING;
     
     let paymentInfo = '';
-    if (house.payment) {
+    if (!isBuilding && house.payment) {
         paymentInfo = `
             <div class="popup-payment">
                 <div class="payment-info">
@@ -1902,6 +2282,28 @@ function createPopupContent(house) {
             </div>
         `;
     }
+
+    let purchasesBlock = '';
+    if (isBuilding) {
+        const purchases = house.purchases || [];
+        const total = purchases.reduce((s, p) => s + p.amount, 0);
+        purchasesBlock = `
+            <div class="purchases-list">
+                ${purchases.length === 0
+                    ? '<div style="font-size:12px;color:#888;padding:6px 0;">Aucun achat enregistré pour cet immeuble.</div>'
+                    : purchases.map(p => `
+                        <div class="purchase-item">
+                            <span>${p.label ? `<strong>${p.label}</strong> — ` : ''}${p.amount}€ (${p.method})</span>
+                            ${currentUser ? `<button class="pi-del" onclick="window.deletePurchase('${house.id}','${p.id}')" title="Supprimer"><i class="fas fa-times"></i></button>` : ''}
+                        </div>
+                    `).join('')}
+            </div>
+            ${purchases.length > 0 ? `<div style="font-size:12px;font-weight:bold;margin-bottom:4px;">Total immeuble : ${total.toFixed(2)}€</div>` : ''}
+            <button class="btn-add-purchase" onclick="window.addPurchase('${house.id}')">
+                <i class="fas fa-plus"></i> Ajouter un achat
+            </button>
+        `;
+    }
     
     return `
         <div class="popup-content">
@@ -1909,18 +2311,26 @@ function createPopupContent(house) {
             <div class="popup-coordinates">
                 ${house.lat.toFixed(5)}, ${house.lng.toFixed(5)}
             </div>
+
+            <select class="house-type-select" onchange="window.setHouseType('${house.id}', this.value)">
+                <option value="${HOUSE_TYPE.HOUSE}" ${!isBuilding ? 'selected' : ''}>🏠 Maison</option>
+                <option value="${HOUSE_TYPE.BUILDING}" ${isBuilding ? 'selected' : ''}>🏢 Immeuble (plusieurs achats)</option>
+            </select>
+
             ${house.note ? `<div class="popup-note">${house.note}</div>` : ''}
             ${paymentInfo}
-            <div><small>Ajouté par: ${userName}</small></div>
+            ${purchasesBlock}
+            <div><small>Ajouté par: ${userName}${house.zone ? ` · secteur : ${house.zone}` : ''}</small></div>
             <div class="status-buttons">
                 <button class="status-btn" style="background-color: #9E9E9E;" 
                         onclick="window.updateHouseStatus('${house.id}', '${STATUS.NOT_PASSED}')">
                     Non passé
                 </button>
+                ${!isBuilding ? `
                 <button class="status-btn" style="background-color: #4CAF50;" 
                         onclick="window.updateHouseStatus('${house.id}', '${STATUS.BOUGHT}')">
                     Acheté
-                </button>
+                </button>` : ''}
                 <button class="status-btn" style="background-color: #FF5722;" 
                         onclick="window.updateHouseStatus('${house.id}', '${STATUS.NOT_BOUGHT}')">
                     Non acheté
@@ -1934,7 +2344,7 @@ function createPopupContent(house) {
                 <button class="btn-edit" onclick="window.editNote('${house.id}')">
                     <i class="fas fa-edit"></i> Note
                 </button>
-                ${currentUser && currentUser.email === house.createdBy ? 
+                ${currentUser && (currentUser.email === house.createdBy || currentUser.role === 'admin') ? 
                     `<button class="btn-delete" onclick="window.deleteHouse('${house.id}')">
                         <i class="fas fa-trash"></i> Supprimer
                     </button>` : 
@@ -1948,7 +2358,7 @@ function createPopupContent(house) {
 // Ajouter un marqueur
 function addMarker(house) {
     const marker = L.marker([house.lat, house.lng], {
-        icon: STATUS_ICONS[house.status]
+        icon: getHouseIcon(house)
     }).addTo(map);
     
     marker.bindPopup(createPopupContent(house));
@@ -1960,9 +2370,66 @@ function addMarker(house) {
 function updateMarker(house) {
     const marker = markers.get(house.id);
     if (marker) {
-        marker.setIcon(STATUS_ICONS[house.status]);
+        marker.setIcon(getHouseIcon(house));
         marker.setPopupContent(createPopupContent(house));
     }
+}
+
+// Changer le type d'un point (maison <-> immeuble)
+function setHouseType(id, newType) {
+    const house = houses.find(h => h.id === id);
+    if (!house) return;
+    house.type = newType;
+    if (newType === HOUSE_TYPE.BUILDING) {
+        house.purchases = house.purchases || [];
+    }
+    house.updatedAt = new Date().toISOString();
+    updateMarker(house);
+    saveHouses();
+    syncHouseRemote(house);
+    updateStats();
+    updateRanking();
+}
+
+// Recalcule le statut d'un immeuble en fonction de ses achats
+function recomputeBuildingStatus(house) {
+    if ((house.purchases || []).length > 0) {
+        house.status = STATUS.BOUGHT;
+    } else if (house.status === STATUS.BOUGHT) {
+        house.status = STATUS.NOT_PASSED;
+    }
+}
+
+// Ouvre le popup de paiement en mode "ajout d'un achat" (immeuble)
+function addPurchase(houseId) {
+    const house = houses.find(h => h.id === houseId);
+    if (!house) return;
+    purchaseMode = true;
+    editingMarkerId = houseId;
+
+    document.getElementById('paymentPopupTitle').innerHTML = '<i class="fas fa-euro-sign"></i> Ajouter un achat (immeuble)';
+    document.getElementById('editAddress').value = house.address;
+    document.getElementById('purchaseLabelGroup').style.display = 'block';
+    document.getElementById('purchaseLabel').value = '';
+    document.getElementById('paymentAmount').value = '';
+    document.getElementById('additionalNote').value = '';
+    document.querySelector('input[name="paymentMethod"]:checked')?.removeAttribute('checked');
+
+    document.getElementById('paymentPopup').style.display = 'block';
+}
+
+function deletePurchase(houseId, purchaseId) {
+    const house = houses.find(h => h.id === houseId);
+    if (!house) return;
+    if (!confirm("Supprimer cet achat ?")) return;
+    house.purchases = (house.purchases || []).filter(p => p.id !== purchaseId);
+    recomputeBuildingStatus(house);
+    house.updatedAt = new Date().toISOString();
+    updateMarker(house);
+    saveHouses();
+    syncHouseRemote(house);
+    updateStats();
+    updateRanking();
 }
 
 // INITIALISATION DE LA CARTE
@@ -1982,49 +2449,6 @@ function initMap() {
         minZoom: 6
     }).addTo(map);
     
-    // Gérer le clic sur la carte pour ajouter des maisons
-    map.on('click', async function(e) {
-        if (!currentUser) return;
-        
-        // Si on est en mode ajout de maison
-        if (isAddingHouse) {
-            showLoader();
-            try {
-                const address = await reverseGeocode(e.latlng.lat, e.latlng.lng);
-                
-                const id = 'house_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-                
-                const house = {
-                    id: id,
-                    lat: e.latlng.lat,
-                    lng: e.latlng.lng,
-                    address: address,
-                    status: STATUS.NOT_PASSED,
-                    note: '',
-                    createdBy: currentUser.email,
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString()
-                };
-                
-                houses.push(house);
-                saveHouses();
-                addMarker(house);
-                updateStats();
-                updateRanking();
-                
-                hideLoader();
-                
-                // Désactiver le mode ajout
-                isAddingHouse = false;
-                alert("Maison ajoutée avec succès !");
-                
-            } catch (error) {
-                hideLoader();
-                alert("Impossible de récupérer l'adresse. Veuillez réessayer.");
-            }
-        }
-    });
-    
     // Ajouter toutes les maisons existantes
     houses.forEach(house => {
         addMarker(house);
@@ -2043,6 +2467,11 @@ function showPaymentPopupForHouse(houseId) {
     
     editingMarkerId = houseId;
     
+    // Mode "paiement classique maison" (pas un achat d'immeuble)
+    purchaseMode = false;
+    document.getElementById('paymentPopupTitle').innerHTML = '<i class="fas fa-euro-sign"></i> Informations de paiement';
+    document.getElementById('purchaseLabelGroup').style.display = 'none';
+
     // Pré-remplir le formulaire
     document.getElementById('editAddress').value = house.address;
     document.getElementById('paymentAmount').value = house.payment ? house.payment.amount : '';
@@ -2065,7 +2494,9 @@ function showPaymentPopupForHouse(houseId) {
 
 function hidePaymentPopup() {
     document.getElementById('paymentPopup').style.display = 'none';
+    document.getElementById('purchaseLabelGroup').style.display = 'none';
     editingMarkerId = null;
+    purchaseMode = false;
 }
 
 function savePaymentInfo() {
@@ -2092,9 +2523,26 @@ function savePaymentInfo() {
         return;
     }
     
-    // Mettre à jour la maison existante
     const house = houses.find(h => h.id === editingMarkerId);
-    if (house) {
+    if (!house) return;
+
+    if (purchaseMode) {
+        // Ajout d'un achat sur un immeuble (n'écrase pas les autres achats du point)
+        const label = document.getElementById('purchaseLabel').value.trim();
+        house.address = address;
+        house.purchases = house.purchases || [];
+        house.purchases.push({
+            id: 'p_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+            label: label,
+            amount: amount,
+            method: paymentMethod.value,
+            note: additionalNote,
+            date: new Date().toISOString()
+        });
+        recomputeBuildingStatus(house);
+        house.updatedAt = new Date().toISOString();
+    } else {
+        // Maison classique : un seul paiement
         house.address = address;
         house.status = STATUS.BOUGHT;
         house.note = additionalNote;
@@ -2104,24 +2552,14 @@ function savePaymentInfo() {
             date: new Date().toISOString()
         };
         house.updatedAt = new Date().toISOString();
-        
-        // Mettre à jour le marqueur
-        updateMarker(house);
-        
-        // Sauvegarder
-        saveHouses();
-        
-        // Mettre à jour les statistiques
-        updateStats();
-        
-        // Mettre à jour le classement
-        updateRanking();
-        
-        // Cacher le popup
-        hidePaymentPopup();
-        
-        alert(`Paiement enregistré avec succès !\nAdresse: ${address}\nMontant: ${amount}€\nMoyen de paiement: ${paymentMethod.value}`);
     }
+
+    updateMarker(house);
+    saveHouses();
+    syncHouseRemote(house);
+    updateStats();
+    updateRanking();
+    hidePaymentPopup();
 }
 
 // GESTION DES MAISONS
@@ -2129,15 +2567,26 @@ function updateHouseStatus(id, newStatus) {
     const house = houses.find(h => h.id === id);
     if (house) {
         const oldStatus = house.status;
+        const isBuilding = house.type === HOUSE_TYPE.BUILDING;
+
+        // Pour un immeuble, "Acheté" ne se déclenche que via l'ajout d'un achat
+        if (isBuilding && newStatus === STATUS.BOUGHT) {
+            addPurchase(id);
+            return;
+        }
+
         house.status = newStatus;
         house.updatedAt = new Date().toISOString();
         
         // Si le statut devient "acheté", ouvrir le popup de paiement
-        if (newStatus === STATUS.BOUGHT && oldStatus !== STATUS.BOUGHT) {
+        if (!isBuilding && newStatus === STATUS.BOUGHT && oldStatus !== STATUS.BOUGHT) {
             showPaymentPopupForHouse(id);
-        } else if (newStatus !== STATUS.BOUGHT) {
+        } else if (!isBuilding && newStatus !== STATUS.BOUGHT) {
             // Si on change d'un statut "acheté" vers un autre statut, supprimer les infos de paiement
             delete house.payment;
+        } else if (isBuilding) {
+            // On vide les achats si on marque manuellement l'immeuble comme non passé/absent/non acheté
+            house.purchases = [];
         }
         
         // Mettre à jour le marqueur
@@ -2145,6 +2594,7 @@ function updateHouseStatus(id, newStatus) {
         
         // Sauvegarder
         saveHouses();
+        syncHouseRemote(house);
         
         // Mettre à jour les statistiques
         updateStats();
@@ -2178,6 +2628,7 @@ function saveNote() {
         
         // Sauvegarder
         saveHouses();
+        syncHouseRemote(house);
         
         // Cacher l'éditeur
         hideNoteEditor();
@@ -2208,6 +2659,7 @@ function deleteHouse(id) {
         
         // Sauvegarder
         saveHouses();
+        deleteHouseRemote(id);
         
         // Mettre à jour les statistiques
         updateStats();
@@ -2260,14 +2712,15 @@ function signup() {
         return;
     }
     
-    const newUser = {
+    const newUser = normalizeUser({
         email: email,
         password: password,
         pseudo: pseudo
-    };
+    });
     
     users.push(newUser);
     saveUsers();
+    syncUserRemote(newUser);
     
     loginUser(newUser);
     saveRememberMe(email, pseudo, remember);
@@ -2275,9 +2728,13 @@ function signup() {
 
 function loginUser(user) {
     currentUser = user;
+    user.lastLogin = new Date().toISOString();
+    saveUsers();
+    syncUserRemote(user);
+
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
-    document.getElementById('userPseudo').textContent = user.pseudo;
+    document.getElementById('userPseudo').textContent = user.pseudo + (user.role === 'admin' ? ' (admin)' : '');
     
     // Initialiser la carte
     initMap();
@@ -2287,6 +2744,9 @@ function loginUser(user) {
     
     // Mettre à jour le classement
     updateRanking();
+
+    // Secteur personnel
+    renderMyZone();
 }
 
 function logout() {
@@ -2315,46 +2775,133 @@ function showError(message) {
     }, 5000);
 }
 
-// FONCTION RESET (admin seulement)
+function isCurrentUserAdmin() {
+    return !!currentUser && (currentUser.role === 'admin' || currentUser.email === ADMIN_EMAIL);
+}
+
+// FONCTION RESET TOTAL (admin seulement) : supprime utilisateurs + maisons
 function resetData() {
-    if (currentUser && currentUser.email === ADMIN_EMAIL) {
-        if (confirm("Êtes-vous sûr de vouloir réinitialiser toutes les données ? Cette action est irréversible.")) {
-            localStorage.removeItem('calentour_houses');
-            localStorage.removeItem('calentour_users');
-            localStorage.removeItem('calentour_remember');
-            
-            houses = [];
-            users = [];
-            currentUser = null;
-            
-            // Supprimer tous les marqueurs
-            markers.forEach(marker => {
-                map.removeLayer(marker);
-            });
-            markers.clear();
-            
-            // Retour à l'écran de connexion
-            logout();
-            
-            alert("Toutes les données ont été réinitialisées.");
-        }
-    } else {
+    if (!isCurrentUserAdmin()) {
         alert("Accès refusé. Cette fonction est réservée à l'administrateur.");
+        return;
+    }
+    if (confirm("Êtes-vous sûr de vouloir réinitialiser TOUTES les données (utilisateurs + maisons) ? Cette action est irréversible.")) {
+        localStorage.removeItem('calentour_houses');
+        localStorage.removeItem('calentour_users');
+        localStorage.removeItem('calentour_remember');
+
+        if (firebaseReady) {
+            db.ref('houses').remove().catch(e => console.error(e));
+            db.ref('users').remove().catch(e => console.error(e));
+        }
+        
+        houses = [];
+        users = [];
+        currentUser = null;
+        
+        // Supprimer tous les marqueurs
+        markers.forEach(marker => {
+            map.removeLayer(marker);
+        });
+        markers.clear();
+        
+        // Retour à l'écran de connexion
+        logout();
+        
+        alert("Toutes les données ont été réinitialisées.");
     }
 }
 
-// FONCTION POUR ACTIVER LE MODE AJOUT DE MAISON
-function toggleAddHouseMode() {
-    isAddingHouse = !isAddingHouse;
-    
-    if (isAddingHouse) {
-        alert("Mode ajout de maison activé. Cliquez sur la carte pour ajouter une maison.");
-        document.getElementById('btnAddHouse').innerHTML = '<i class="fas fa-times"></i> Annuler l\'ajout';
-        document.getElementById('btnAddHouse').style.backgroundColor = '#f44336';
-    } else {
-        document.getElementById('btnAddHouse').innerHTML = '<i class="fas fa-plus"></i> Ajouter une maison';
-        document.getElementById('btnAddHouse').style.backgroundColor = '#FF9800';
+// FONCTION NOUVELLE SAISON (admin seulement) : remet tous les points en gris
+// sans supprimer les adresses. Il faudra donc repasser à chaque adresse.
+function resetSeason() {
+    if (!isCurrentUserAdmin()) {
+        alert("Accès refusé. Cette fonction est réservée à l'administrateur.");
+        return;
     }
+    if (!confirm("Démarrer une nouvelle saison ?\n\nTous les points repasseront en GRIS (non passé). Les adresses et positions sont conservées, mais les statuts, notes, paiements et achats seront effacés. Cette action est irréversible.")) {
+        return;
+    }
+
+    houses.forEach(house => {
+        house.status = STATUS.NOT_PASSED;
+        house.note = '';
+        delete house.payment;
+        house.purchases = [];
+        house.updatedAt = new Date().toISOString();
+        updateMarker(house);
+        syncHouseRemote(house);
+    });
+
+    saveHouses();
+    updateStats();
+    updateRanking();
+
+    alert("Nouvelle saison lancée : tous les points sont repassés en gris.");
+}
+
+// FONCTION POUR AJOUTER UNE MAISON : place directement le point à la position GPS actuelle
+async function quickAddHouse() {
+    if (!currentUser) return;
+
+    if (!navigator.geolocation) {
+        alert("La géolocalisation n'est pas supportée par votre navigateur");
+        return;
+    }
+
+    const btns = [document.getElementById('btnAddHouse'), document.getElementById('btnFloatingAdd')];
+    btns.forEach(b => { if (b) b.disabled = true; });
+    showLoader();
+
+    navigator.geolocation.getCurrentPosition(
+        async function(position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+
+            try {
+                const address = await reverseGeocode(lat, lng);
+                const id = 'house_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+                const house = normalizeHouse({
+                    id: id,
+                    lat: lat,
+                    lng: lng,
+                    address: address,
+                    status: STATUS.NOT_PASSED,
+                    createdBy: currentUser.email,
+                    zone: currentUser.zone || null,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                });
+
+                houses.push(house);
+                saveHouses();
+                syncHouseRemote(house);
+                addMarker(house);
+                updateStats();
+                updateRanking();
+
+                userCurrentLocation = { lat, lng };
+                updateUserLocationMarker(lat, lng);
+                map.setView([lat, lng], 17);
+            } catch (error) {
+                alert("Impossible de récupérer l'adresse. Veuillez réessayer.");
+            } finally {
+                hideLoader();
+                btns.forEach(b => { if (b) b.disabled = false; });
+            }
+        },
+        function(error) {
+            hideLoader();
+            btns.forEach(b => { if (b) b.disabled = false; });
+            alert("Erreur de géolocalisation. Veuillez activer la géolocalisation dans les paramètres de votre navigateur.");
+        },
+        {
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 0
+        }
+    );
 }
 
 // GESTION DE LA BARRE LATÉRALE MOBILE
@@ -2373,9 +2920,13 @@ function toggleUserMenu() {
 
 // INITIALISATION AU CHARGEMENT
 document.addEventListener('DOMContentLoaded', function() {
-    // Charger les données
-    houses = JSON.parse(localStorage.getItem('calentour_houses')) || [];
-    users = JSON.parse(localStorage.getItem('calentour_users')) || [];
+    // Charger les données locales (cache hors-ligne)
+    houses = (JSON.parse(localStorage.getItem('calentour_houses')) || []).map(normalizeHouse);
+    users = (JSON.parse(localStorage.getItem('calentour_users')) || []).map(normalizeUser);
+
+    // Activer le mode réseau si Firebase est configuré (voir firebaseConfig plus haut)
+    initFirebase();
+    listenRemote();
     
     // Vérifier si "Se souvenir de moi" est activé
     const rememberData = localStorage.getItem('calentour_remember');
@@ -2402,15 +2953,16 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('btnSignup').addEventListener('click', signup);
     document.getElementById('btnLogout').addEventListener('click', logout);
     document.getElementById('btnReset').addEventListener('click', resetData);
+    document.getElementById('btnResetSeason').addEventListener('click', resetSeason);
     document.getElementById('btnLocate').addEventListener('click', locateUser);
     document.getElementById('btnTrack').addEventListener('click', toggleLocationTracking);
     document.getElementById('btnChart').addEventListener('click', showChartScreen);
     document.getElementById('btnCloseChart').addEventListener('click', hideChartScreen);
-    document.getElementById('btnAddHouse').addEventListener('click', toggleAddHouseMode);
+    document.getElementById('btnAddHouse').addEventListener('click', quickAddHouse);
     
     // Boutons flottants pour mobile
     document.getElementById('btnFloatingLocate').addEventListener('click', locateUser);
-    document.getElementById('btnFloatingAdd').addEventListener('click', toggleAddHouseMode);
+    document.getElementById('btnFloatingAdd').addEventListener('click', quickAddHouse);
     
     // Gestion des popups
     document.getElementById('btnCancelPayment').addEventListener('click', hidePaymentPopup);
@@ -2434,6 +2986,11 @@ document.addEventListener('DOMContentLoaded', function() {
     window.updateHouseStatus = updateHouseStatus;
     window.editNote = editNote;
     window.deleteHouse = deleteHouse;
+    window.setHouseType = setHouseType;
+    window.addPurchase = addPurchase;
+    window.deletePurchase = deletePurchase;
+    window.assignZone = assignZone;
+    window.toggleAdminRole = toggleAdminRole;
 });
 
 // Redimensionner la carte lorsque la fenêtre change de taille
