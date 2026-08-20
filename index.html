@@ -7,6 +7,7 @@
     
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
     
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -777,6 +778,7 @@
             width: 20px;
             height: 20px;
             box-shadow: 0 0 10px rgba(33, 150, 243, 0.7);
+            pointer-events: none; /* le point bleu ne doit jamais intercepter un clic */
         }
         
         /* Bouton flottant pour mobile */
@@ -1015,20 +1017,12 @@
         }
         .admin-user-row .au-name { font-weight: bold; flex: 1 1 100%; }
         .admin-user-row .au-email { color: #888; font-size: 11px; flex: 1 1 100%; }
-        .admin-user-row input.au-zone {
-            flex: 1;
-            min-width: 90px;
-            padding: 5px 7px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            font-size: 12px;
-        }
+        .admin-user-row .au-zones { flex: 1 1 100%; font-size: 11px; color: #555; }
         .admin-user-row button {
             font-size: 11px;
             padding: 5px 8px;
         }
         .btn-admin-toggle { background-color: #607d8b; }
-        .btn-zone-save { background-color: #4CAF50; }
 
         .my-zone-box {
             background: #fff3e0;
@@ -1037,6 +1031,97 @@
             padding: 8px 10px;
             font-size: 13px;
             margin-bottom: 10px;
+        }
+        .my-zone-box .zone-badge { margin: 2px 4px 2px 0; }
+
+        /* ===== Secteurs (zones polygonales) ===== */
+        .zone-card {
+            background: white;
+            border: 1px solid #ddd;
+            border-left: 5px solid #d32f2f;
+            border-radius: 6px;
+            padding: 8px 10px;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+        .zone-card .zc-name {
+            font-weight: bold;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 3px;
+        }
+        .zone-card .zc-color-dot {
+            width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+        }
+        .zone-card .zc-meta { color: #888; margin-bottom: 6px; }
+        .zone-card .zc-people { color: #555; margin-bottom: 6px; }
+        .zone-card .zc-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+        .zone-card .zc-actions button {
+            font-size: 11px;
+            padding: 5px 8px;
+        }
+        .btn-zone-shape { background-color: #2196F3; }
+        .btn-zone-people { background-color: #9C27B0; }
+        .btn-zone-rename { background-color: #607d8b; }
+        .btn-zone-delete { background-color: #f44336; }
+        .btn-zone-toggle-map { background-color: #4CAF50; }
+        .btn-new-zone { width: 100%; justify-content: center; margin-bottom: 10px; background-color: #d32f2f; }
+
+        .zone-people-popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 1000;
+            width: 90%;
+            max-width: 380px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .zone-people-popup h3 { color: #d32f2f; margin-bottom: 12px; }
+        .zone-people-popup .zp-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 4px;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+        }
+        .zone-people-popup .zp-row input { width: 16px; height: 16px; }
+        .zone-people-popup .zp-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .draw-banner {
+            display: none;
+            position: fixed;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #d32f2f;
+            color: white;
+            padding: 10px 18px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 500;
+            font-size: 13px;
+            text-align: center;
+            max-width: 90%;
+        }
+        .draw-banner button {
+            margin-top: 8px;
+            font-size: 12px;
+            padding: 5px 10px;
         }
 
         .house-type-select {
@@ -1239,10 +1324,19 @@
                 <div class="my-zone-box" id="myZoneBox">Aucun secteur attribué</div>
             </div>
 
+            <div class="section" id="adminZonesSection" style="display:none;">
+                <h3><i class="fas fa-draw-polygon"></i> Secteurs</h3>
+                <p style="font-size:12px;color:#777;margin-bottom:8px;">
+                    Dessinez un secteur (un ou plusieurs quartiers) directement sur la carte, puis attribuez-le en un clic aux personnes concernées. Seules ces personnes pourront ajouter des maisons quand elles sont physiquement dans le secteur.
+                </p>
+                <button id="btnNewZone" class="btn-new-zone"><i class="fas fa-plus"></i> Nouveau secteur</button>
+                <div id="adminZoneList"></div>
+            </div>
+
             <div class="section" id="adminSection" style="display:none;">
                 <h3><i class="fas fa-user-shield"></i> Administration</h3>
                 <p style="font-size:12px;color:#777;margin-bottom:8px;">
-                    Attribuez un secteur de distribution à chaque personne connectée, ou donnez-lui les droits admin.
+                    Gérez les droits administrateur des personnes connectées.
                 </p>
                 <div id="adminUserList"></div>
 
@@ -1355,6 +1449,22 @@
     </button>
 </div>
 
+<!-- Bannière mode dessin de secteur -->
+<div id="drawBanner" class="draw-banner">
+    <div id="drawBannerText">Cliquez sur la carte pour placer les points du contour. Double-cliquez pour terminer la forme.</div>
+    <button id="btnFinishZoneDrawing" style="background:white;color:#d32f2f;">Terminer le secteur</button>
+</div>
+
+<!-- Popup d'attribution des personnes à un secteur -->
+<div id="zonePeoplePopup" class="zone-people-popup">
+    <h3><i class="fas fa-users"></i> Attribuer des personnes</h3>
+    <div id="zonePeopleList"></div>
+    <div class="zp-buttons">
+        <button id="btnCancelZonePeople" style="background-color:#777;">Annuler</button>
+        <button id="btnSaveZonePeople" style="background-color:#d32f2f;">Enregistrer</button>
+    </div>
+</div>
+
 <!-- Éditeur de note -->
 <div id="noteEditor" class="note-editor">
     <h3>Modifier la note</h3>
@@ -1432,6 +1542,7 @@
 
 <!-- Script JavaScript -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
 
 <script>
 // CONFIGURATION
@@ -1460,6 +1571,16 @@ const HOUSE_TYPE = {
 };
 
 let purchaseMode = false; // true = le popup de paiement sert à ajouter un achat sur un immeuble
+
+// Variables pour les secteurs (zones polygonales dessinées par l'admin)
+let zones = [];
+let zonesLayerGroup = null;
+let drawnItemsLayer = null;
+let zoneDrawControl = null;
+let currentDrawingZone = null; // le secteur en cours de dessin (nouveau ou existant)
+let isNewZoneBeingCreated = false;
+let pendingZonePeopleId = null;
+const ZONE_COLORS = ['#d32f2f', '#1976D2', '#388E3C', '#7B1FA2', '#F57C00', '#00838F', '#5D4037', '#C2185B'];
 
 // ==================================================================
 // MODE RÉSEAU (Firebase Realtime Database)
@@ -1534,6 +1655,30 @@ function syncUserRemote(user) {
     }
 }
 
+function syncZoneRemote(zone) {
+    if (firebaseReady) {
+        db.ref('zones/' + zone.id).set(zone).catch(e => console.error(e));
+    }
+}
+
+function deleteZoneRemote(id) {
+    if (firebaseReady) {
+        db.ref('zones/' + id).remove().catch(e => console.error(e));
+    }
+}
+
+function normalizeZone(z) {
+    return Object.assign({
+        polygons: [],
+        assignedEmails: [],
+        color: ZONE_COLORS[0]
+    }, z);
+}
+
+function saveZones() {
+    localStorage.setItem('calentour_zones', JSON.stringify(zones));
+}
+
 // Rend une maison "fraîche" (valeurs par défaut pour les anciennes données)
 function normalizeHouse(h) {
     return Object.assign({
@@ -1576,6 +1721,15 @@ function listenRemote() {
         renderMyZone();
         updateRanking();
     });
+
+    db.ref('zones').on('value', snapshot => {
+        const val = snapshot.val() || {};
+        zones = Object.values(val).map(normalizeZone);
+        saveZones();
+        if (map) renderZonesOnMap();
+        renderZonesAdminPanel();
+        renderMyZone();
+    });
 }
 
 // Redessine tous les marqueurs (utilisé après une mise à jour reçue du réseau)
@@ -1588,6 +1742,7 @@ function renderAllMarkers() {
 // Données (stockage local, mis à jour ensuite par le réseau si disponible)
 let houses = (JSON.parse(localStorage.getItem('calentour_houses')) || []).map(normalizeHouse);
 let users = (JSON.parse(localStorage.getItem('calentour_users')) || []).map(normalizeUser);
+zones = (JSON.parse(localStorage.getItem('calentour_zones')) || []).map(normalizeZone);
 
 // Système de points
 const POINTS = {
@@ -2110,19 +2265,16 @@ function updateUserLocationMarker(lat, lng) {
         className: 'user-location-marker'
     });
     
-    // Ajouter le marqueur
+    // Ajouter le marqueur : non cliquable et toujours en arrière-plan
+    // (pane dédiée sous les maisons + interactive:false = aucun clic possible dessus,
+    // donc un clic à cet endroit atteint toujours la maison en dessous s'il y en a une)
     userLocationMarker = L.marker([lat, lng], {
         icon: userIcon,
-        zIndexOffset: 1000
+        zIndexOffset: -1000,
+        pane: 'userLocationPane',
+        interactive: false,
+        keyboard: false
     }).addTo(map);
-    
-    // Ajouter un popup d'information
-    userLocationMarker.bindPopup(`
-        <div style="text-align: center; padding: 5px;">
-            <strong>Votre position</strong><br>
-            <small>${lat.toFixed(5)}, ${lng.toFixed(5)}</small>
-        </div>
-    `);
 }
 
 function showLoader() {
@@ -2179,11 +2331,15 @@ function updateStats() {
     // Afficher/masquer le panneau admin
     const isAdmin = currentUser.role === 'admin' || currentUser.email === ADMIN_EMAIL;
     document.getElementById('adminSection').style.display = isAdmin ? 'block' : 'none';
-    if (isAdmin) renderAdminPanel();
+    document.getElementById('adminZonesSection').style.display = isAdmin ? 'block' : 'none';
+    if (isAdmin) {
+        renderAdminPanel();
+        renderZonesAdminPanel();
+    }
 }
 
 // ==================================================================
-// PANNEAU ADMINISTRATEUR : secteurs + gestion des rôles
+// PANNEAU ADMINISTRATEUR : gestion des rôles
 // ==================================================================
 function renderAdminPanel() {
     if (!currentUser) return;
@@ -2202,32 +2358,18 @@ function renderAdminPanel() {
     users.slice().sort((a, b) => a.pseudo.localeCompare(b.pseudo)).forEach(u => {
         const lastSeen = u.lastLogin ? new Date(u.lastLogin).toLocaleString('fr-FR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}) : 'jamais connecté';
         const isUserAdmin = u.role === 'admin';
+        const userZones = getUserAssignedZones(u.email);
+        const zonesText = userZones.length ? userZones.map(z => z.name).join(', ') : 'aucun secteur';
         html += `
             <div class="admin-user-row">
                 <div class="au-name">${u.pseudo} ${isUserAdmin ? '<span class="zone-badge">ADMIN</span>' : ''}</div>
                 <div class="au-email">${u.email} · dernière connexion : ${lastSeen}</div>
-                <input type="text" class="au-zone" placeholder="Secteur (ex: Rue du centre)" value="${u.zone ? u.zone.replace(/"/g,'&quot;') : ''}" id="zoneInput_${emailKey(u.email)}">
-                <button class="btn-zone-save" onclick="window.assignZone('${u.email}')"><i class="fas fa-save"></i></button>
+                <div class="au-zones"><i class="fas fa-map-marked-alt"></i> ${zonesText}</div>
                 ${u.email !== ADMIN_EMAIL ? `<button class="btn-admin-toggle" onclick="window.toggleAdminRole('${u.email}')">${isUserAdmin ? 'Retirer admin' : 'Rendre admin'}</button>` : ''}
             </div>
         `;
     });
     container.innerHTML = html;
-}
-
-function assignZone(email) {
-    const user = users.find(u => u.email === email);
-    if (!user) return;
-    const input = document.getElementById('zoneInput_' + emailKey(email));
-    const zone = input ? input.value.trim() : '';
-    user.zone = zone || null;
-    saveUsers();
-    syncUserRemote(user);
-    if (currentUser && currentUser.email === email) {
-        currentUser.zone = user.zone;
-        renderMyZone();
-    }
-    alert(`Secteur "${user.zone || 'aucun'}" attribué à ${user.pseudo}.`);
 }
 
 function toggleAdminRole(email) {
@@ -2245,9 +2387,264 @@ function renderMyZone() {
     const box = document.getElementById('myZoneBox');
     if (!section || !box) return;
     section.style.display = 'block';
-    box.innerHTML = currentUser.zone
-        ? `<i class="fas fa-map-marker-alt"></i> Secteur attribué : <span class="zone-badge">${currentUser.zone}</span>`
-        : `Aucun secteur attribué pour l'instant. Voyez avec l'administrateur.`;
+    const myZones = getUserAssignedZones(currentUser.email);
+    box.innerHTML = myZones.length
+        ? `<i class="fas fa-map-marker-alt"></i> Secteur(s) attribué(s) : ` + myZones.map(z => `<span class="zone-badge" style="background:${z.color}">${z.name}</span>`).join('')
+        : `Aucun secteur attribué pour l'instant : vous pouvez ajouter des maisons n'importe où. Voyez avec l'administrateur pour être limité à un secteur précis.`;
+}
+
+// ==================================================================
+// SECTEURS (zones polygonales dessinées à la main sur la carte)
+// ==================================================================
+
+// Algorithme "ray casting" : le point [lat,lng] est-il dans le polygone (liste de [lat,lng]) ?
+function pointInPolygon(lat, lng, polygon) {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const yi = polygon[i][0], xi = polygon[i][1];
+        const yj = polygon[j][0], xj = polygon[j][1];
+        const intersect = ((yi > lat) !== (yj > lat)) &&
+            (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
+}
+
+function isPointInZone(lat, lng, zone) {
+    return (zone.polygons || []).some(poly => pointInPolygon(lat, lng, poly));
+}
+
+function getUserAssignedZones(email) {
+    return zones.filter(z => (z.assignedEmails || []).includes(email));
+}
+
+// Vérifie qu'un utilisateur a le droit d'ajouter un point à cette position.
+// Règle : si l'utilisateur n'a AUCUN secteur attribué, il n'est pas restreint (comportement historique).
+// S'il a au moins un secteur attribué, il doit être physiquement dans l'un de ces secteurs.
+function isAllowedToAddHere(user, lat, lng) {
+    if (isCurrentUserAdmin_(user)) return true;
+    const myZones = getUserAssignedZones(user.email);
+    if (myZones.length === 0) return true;
+    return myZones.some(z => isPointInZone(lat, lng, z));
+}
+
+function isCurrentUserAdmin_(user) {
+    return !!user && (user.role === 'admin' || user.email === ADMIN_EMAIL);
+}
+
+// Affiche les secteurs sur la carte : l'admin voit tous les secteurs, un utilisateur normal
+// ne voit que ceux qui lui sont attribués. Les formes ne sont jamais cliquables
+// (interactive:false) pour ne jamais bloquer un clic sur une maison en dessous.
+function renderZonesOnMap() {
+    if (!zonesLayerGroup) return;
+    zonesLayerGroup.clearLayers();
+    if (!currentUser) return;
+
+    const visibleZones = isCurrentUserAdmin() ? zones : getUserAssignedZones(currentUser.email);
+
+    visibleZones.forEach(zone => {
+        (zone.polygons || []).forEach(poly => {
+            const latlngs = poly.map(p => [p[0], p[1]]);
+            L.polygon(latlngs, {
+                color: zone.color,
+                weight: 2,
+                fillColor: zone.color,
+                fillOpacity: 0.10,
+                interactive: false
+            }).addTo(zonesLayerGroup);
+        });
+
+        // Étiquette avec le nom du secteur au centre de sa première forme
+        const firstPoly = (zone.polygons || [])[0];
+        if (firstPoly && firstPoly.length) {
+            const avgLat = firstPoly.reduce((s, p) => s + p[0], 0) / firstPoly.length;
+            const avgLng = firstPoly.reduce((s, p) => s + p[1], 0) / firstPoly.length;
+            L.marker([avgLat, avgLng], {
+                icon: L.divIcon({
+                    html: `<div style="background:${zone.color};color:white;font-size:11px;font-weight:bold;padding:2px 8px;border-radius:10px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.3);">${zone.name}</div>`,
+                    className: '',
+                    iconSize: null
+                }),
+                interactive: false
+            }).addTo(zonesLayerGroup);
+        }
+    });
+}
+
+// Démarre la création d'un nouveau secteur
+function startNewZone() {
+    if (!isCurrentUserAdmin()) return;
+    const name = prompt("Nom du secteur (peut regrouper plusieurs quartiers, ex: \"Rondes du centre-ville\") :");
+    if (!name || !name.trim()) return;
+
+    currentDrawingZone = normalizeZone({
+        id: 'zone_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+        name: name.trim(),
+        color: ZONE_COLORS[zones.length % ZONE_COLORS.length],
+        polygons: [],
+        assignedEmails: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+    });
+    isNewZoneBeingCreated = true;
+    enterDrawMode();
+}
+
+// Ajoute une forme (un quartier de plus) à un secteur déjà existant
+function addShapeToZone(zoneId) {
+    if (!isCurrentUserAdmin()) return;
+    const zone = zones.find(z => z.id === zoneId);
+    if (!zone) return;
+    currentDrawingZone = zone;
+    isNewZoneBeingCreated = false;
+    enterDrawMode();
+}
+
+function enterDrawMode() {
+    document.getElementById('drawBannerText').textContent =
+        `Secteur "${currentDrawingZone.name}" : cliquez sur la carte pour poser les points du contour d'un quartier, double-cliquez pour fermer la forme.`;
+    document.getElementById('drawBanner').style.display = 'block';
+    if (!zoneDrawControl) {
+        zoneDrawControl = new L.Draw.Polygon(map, { shapeOptions: { color: '#d32f2f' } });
+    }
+    zoneDrawControl.enable();
+}
+
+function finishZoneDrawing() {
+    if (zoneDrawControl) zoneDrawControl.disable();
+    document.getElementById('drawBanner').style.display = 'none';
+
+    if (!currentDrawingZone) return;
+
+    if (currentDrawingZone.polygons.length === 0) {
+        if (isNewZoneBeingCreated) alert("Aucune forme dessinée : secteur annulé.");
+        currentDrawingZone = null;
+        return;
+    }
+
+    if (isNewZoneBeingCreated) {
+        zones.push(currentDrawingZone);
+    }
+    saveZones();
+    syncZoneRemote(currentDrawingZone);
+
+    const finishedZoneId = currentDrawingZone.id;
+    const wasNew = isNewZoneBeingCreated;
+    currentDrawingZone = null;
+    isNewZoneBeingCreated = false;
+
+    renderZonesOnMap();
+    renderZonesAdminPanel();
+
+    if (wasNew) {
+        openZonePeoplePopup(finishedZoneId);
+    }
+}
+
+function renameZone(zoneId) {
+    const zone = zones.find(z => z.id === zoneId);
+    if (!zone) return;
+    const newName = prompt("Nouveau nom du secteur :", zone.name);
+    if (!newName || !newName.trim()) return;
+    zone.name = newName.trim();
+    zone.updatedAt = new Date().toISOString();
+    saveZones();
+    syncZoneRemote(zone);
+    renderZonesAdminPanel();
+    renderZonesOnMap();
+}
+
+function deleteZone(zoneId) {
+    const zone = zones.find(z => z.id === zoneId);
+    if (!zone) return;
+    if (!confirm(`Supprimer le secteur "${zone.name}" ? Les personnes qui y étaient assignées pourront de nouveau ajouter des maisons n'importe où.`)) return;
+    zones = zones.filter(z => z.id !== zoneId);
+    saveZones();
+    deleteZoneRemote(zoneId);
+    renderZonesAdminPanel();
+    renderZonesOnMap();
+    renderMyZone();
+}
+
+function renderZonesAdminPanel() {
+    if (!currentUser || !isCurrentUserAdmin()) return;
+    const container = document.getElementById('adminZoneList');
+    if (!container) return;
+
+    if (zones.length === 0) {
+        container.innerHTML = '<p style="color:#888;font-size:12px;">Aucun secteur créé pour le moment.</p>';
+        return;
+    }
+
+    let html = '';
+    zones.slice().sort((a, b) => a.name.localeCompare(b.name)).forEach(zone => {
+        const peopleNames = (zone.assignedEmails || []).map(email => {
+            const u = users.find(u => u.email === email);
+            return u ? u.pseudo : email;
+        });
+        html += `
+            <div class="zone-card">
+                <div class="zc-name"><span class="zc-color-dot" style="background:${zone.color}"></span>${zone.name}</div>
+                <div class="zc-meta">${(zone.polygons || []).length} forme(s) dessinée(s)</div>
+                <div class="zc-people">${peopleNames.length ? peopleNames.join(', ') : 'Personne assignée pour l\'instant'}</div>
+                <div class="zc-actions">
+                    <button class="btn-zone-shape" onclick="window.addShapeToZone('${zone.id}')"><i class="fas fa-draw-polygon"></i> Ajouter une forme</button>
+                    <button class="btn-zone-people" onclick="window.openZonePeoplePopup('${zone.id}')"><i class="fas fa-users"></i> Personnes</button>
+                    <button class="btn-zone-rename" onclick="window.renameZone('${zone.id}')"><i class="fas fa-pen"></i></button>
+                    <button class="btn-zone-delete" onclick="window.deleteZone('${zone.id}')"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+        `;
+    });
+    container.innerHTML = html;
+}
+
+function openZonePeoplePopup(zoneId) {
+    const zone = zones.find(z => z.id === zoneId);
+    if (!zone) return;
+    pendingZonePeopleId = zoneId;
+
+    const list = document.getElementById('zonePeopleList');
+    if (users.length === 0) {
+        list.innerHTML = '<p style="color:#888;font-size:12px;">Aucun utilisateur inscrit pour le moment.</p>';
+    } else {
+        list.innerHTML = users.slice().sort((a, b) => a.pseudo.localeCompare(b.pseudo)).map(u => {
+            const checked = (zone.assignedEmails || []).includes(u.email) ? 'checked' : '';
+            const key = emailKey(u.email);
+            return `
+                <div class="zp-row">
+                    <input type="checkbox" id="zp_${key}" ${checked}>
+                    <label for="zp_${key}">${u.pseudo} <small style="color:#999;">(${u.email})</small></label>
+                </div>
+            `;
+        }).join('');
+    }
+
+    document.getElementById('zonePeoplePopup').style.display = 'block';
+}
+
+function hideZonePeoplePopup() {
+    document.getElementById('zonePeoplePopup').style.display = 'none';
+    pendingZonePeopleId = null;
+}
+
+function saveZonePeople() {
+    const zone = zones.find(z => z.id === pendingZonePeopleId);
+    if (!zone) { hideZonePeoplePopup(); return; }
+
+    const emails = users
+        .filter(u => document.getElementById('zp_' + emailKey(u.email))?.checked)
+        .map(u => u.email);
+
+    zone.assignedEmails = emails;
+    zone.updatedAt = new Date().toISOString();
+    saveZones();
+    syncZoneRemote(zone);
+
+    hideZonePeoplePopup();
+    renderZonesAdminPanel();
+    renderZonesOnMap();
+    renderMyZone();
 }
 
 // Icône du marqueur : rond = maison, carré = immeuble
@@ -2449,10 +2846,38 @@ function initMap() {
         maxZoom: 18,
         minZoom: 6
     }).addTo(map);
+
+    // Pane dédiée au point de localisation : toujours SOUS les maisons
+    // (markerPane par défaut = z-index 600, on met celle-ci en dessous)
+    if (!map.getPane('userLocationPane')) {
+        map.createPane('userLocationPane');
+        map.getPane('userLocationPane').style.zIndex = 450;
+        map.getPane('userLocationPane').style.pointerEvents = 'none';
+    }
     
     // Ajouter toutes les maisons existantes
     houses.forEach(house => {
         addMarker(house);
+    });
+
+    // Groupes de calques pour les secteurs (zones dessinées par l'admin)
+    zonesLayerGroup = L.layerGroup().addTo(map);
+    drawnItemsLayer = L.layerGroup().addTo(map);
+    renderZonesOnMap();
+
+    // Écoute la fin du dessin d'une forme de secteur (voir startNewZone / addShapeToZone)
+    map.on(L.Draw.Event.CREATED, function(e) {
+        if (!currentDrawingZone) return;
+        const layer = e.layer;
+        const latlngs = layer.getLatLngs()[0].map(p => [p.lat, p.lng]);
+        currentDrawingZone.polygons.push(latlngs);
+        currentDrawingZone.updatedAt = new Date().toISOString();
+
+        if (confirm(`Forme ajoutée à "${currentDrawingZone.name}".\n\nVoulez-vous dessiner un autre quartier pour ce même secteur ?`)) {
+            zoneDrawControl.enable();
+        } else {
+            finishZoneDrawing();
+        }
     });
     
     // Redimensionner la carte
@@ -2786,18 +3211,21 @@ function resetData() {
         alert("Accès refusé. Cette fonction est réservée à l'administrateur.");
         return;
     }
-    if (confirm("Êtes-vous sûr de vouloir réinitialiser TOUTES les données (utilisateurs + maisons) ? Cette action est irréversible.")) {
+    if (confirm("Êtes-vous sûr de vouloir réinitialiser TOUTES les données (utilisateurs + maisons + secteurs) ? Cette action est irréversible.")) {
         localStorage.removeItem('calentour_houses');
         localStorage.removeItem('calentour_users');
+        localStorage.removeItem('calentour_zones');
         localStorage.removeItem('calentour_remember');
 
         if (firebaseReady) {
             db.ref('houses').remove().catch(e => console.error(e));
             db.ref('users').remove().catch(e => console.error(e));
+            db.ref('zones').remove().catch(e => console.error(e));
         }
         
         houses = [];
         users = [];
+        zones = [];
         currentUser = null;
         
         // Supprimer tous les marqueurs
@@ -2859,10 +3287,20 @@ async function quickAddHouse() {
             const lat = position.coords.latitude;
             const lng = position.coords.longitude;
 
+            // Restriction par secteur : si l'utilisateur a des secteurs attribués,
+            // il doit être physiquement à l'intérieur de l'un d'eux pour pouvoir ajouter.
+            if (!isAllowedToAddHere(currentUser, lat, lng)) {
+                hideLoader();
+                btns.forEach(b => { if (b) b.disabled = false; });
+                alert("Vous êtes en dehors de votre secteur attribué. Vous ne pouvez pas ajouter de maison ici.");
+                return;
+            }
+
             try {
                 const address = await reverseGeocode(lat, lng);
                 const id = 'house_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 
+                const myZones = getUserAssignedZones(currentUser.email);
                 const house = normalizeHouse({
                     id: id,
                     lat: lat,
@@ -2870,7 +3308,7 @@ async function quickAddHouse() {
                     address: address,
                     status: STATUS.NOT_PASSED,
                     createdBy: currentUser.email,
-                    zone: currentUser.zone || null,
+                    zone: myZones.length ? myZones.map(z => z.name).join(', ') : null,
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString()
                 });
@@ -2970,6 +3408,12 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('btnSavePayment').addEventListener('click', savePaymentInfo);
     document.getElementById('btnCancelNote').addEventListener('click', hideNoteEditor);
     document.getElementById('btnSaveNote').addEventListener('click', saveNote);
+
+    // Gestion des secteurs (admin)
+    document.getElementById('btnNewZone').addEventListener('click', startNewZone);
+    document.getElementById('btnFinishZoneDrawing').addEventListener('click', finishZoneDrawing);
+    document.getElementById('btnCancelZonePeople').addEventListener('click', hideZonePeoplePopup);
+    document.getElementById('btnSaveZonePeople').addEventListener('click', saveZonePeople);
     
     // Gestion de la barre latérale mobile
     document.getElementById('menuToggle').addEventListener('click', toggleSidebar);
@@ -2990,8 +3434,11 @@ document.addEventListener('DOMContentLoaded', function() {
     window.setHouseType = setHouseType;
     window.addPurchase = addPurchase;
     window.deletePurchase = deletePurchase;
-    window.assignZone = assignZone;
     window.toggleAdminRole = toggleAdminRole;
+    window.addShapeToZone = addShapeToZone;
+    window.openZonePeoplePopup = openZonePeoplePopup;
+    window.renameZone = renameZone;
+    window.deleteZone = deleteZone;
 });
 
 // Redimensionner la carte lorsque la fenêtre change de taille
