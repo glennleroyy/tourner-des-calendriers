@@ -25,7 +25,7 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Arial', sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
         }
         
         body {
@@ -61,7 +61,7 @@
             background: #ff9800;
             width: 40px;
             height: 40px;
-            border-radius: 8px;
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -86,18 +86,25 @@
             color: white;
             border: none;
             padding: 8px 15px;
-            border-radius: 5px;
+            border-radius: 8px;
             cursor: pointer;
             font-weight: bold;
             display: flex;
             align-items: center;
             gap: 8px;
-            transition: background-color 0.3s;
+            transition: background-color 0.2s ease, transform 0.12s ease, box-shadow 0.12s ease;
             font-size: 14px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.12);
         }
         
         button:hover {
             background-color: #f57c00;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.18);
+        }
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.15);
         }
         
         .btn-logout {
@@ -207,9 +214,10 @@
         /* Sections */
         .section {
             background-color: #f9f9f9;
-            border-radius: 10px;
+            border-radius: 12px;
             padding: 15px;
-            border: 2px solid #e0e0e0;
+            border: 1px solid #e6e6e6;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
         }
         
         .section h3 {
@@ -1110,18 +1118,68 @@
             transform: translateX(-50%);
             background: #d32f2f;
             color: white;
-            padding: 10px 18px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            padding: 12px 18px;
+            border-radius: 12px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.35);
             z-index: 500;
             font-size: 13px;
             text-align: center;
-            max-width: 90%;
+            max-width: 92%;
+            width: 420px;
+        }
+        .draw-banner-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 10px;
         }
         .draw-banner button {
-            margin-top: 8px;
             font-size: 12px;
-            padding: 5px 10px;
+            padding: 6px 12px;
+        }
+        .draw-banner-hint {
+            margin-top: 8px;
+            font-size: 11px;
+            opacity: 0.85;
+        }
+
+        /* Bouton flottant pour créer un secteur (admin uniquement) */
+        .floating-new-zone {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            z-index: 1000;
+        }
+        .floating-new-zone button {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: #d32f2f;
+            color: white;
+            border: none;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        /* Popup de confirmation renforcée (actions destructrices) */
+        .danger-confirm-popup p {
+            font-size: 13px;
+            color: #555;
+            line-height: 1.5;
+            margin-bottom: 12px;
+        }
+        .danger-confirm-popup input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #f44336;
+            border-radius: 6px;
+            font-size: 14px;
+            margin-bottom: 5px;
         }
 
         .house-type-select {
@@ -1449,10 +1507,31 @@
     </button>
 </div>
 
+<!-- Bouton flottant pour créer un secteur (admin uniquement, affiché en JS) -->
+<div id="floatingNewZone" class="floating-new-zone" style="display:none;">
+    <button id="btnFloatingNewZone" title="Nouveau secteur">
+        <i class="fas fa-draw-polygon"></i>
+    </button>
+</div>
+
 <!-- Bannière mode dessin de secteur -->
 <div id="drawBanner" class="draw-banner">
     <div id="drawBannerText">Cliquez sur la carte pour placer les points du contour. Double-cliquez pour terminer la forme.</div>
-    <button id="btnFinishZoneDrawing" style="background:white;color:#d32f2f;">Terminer le secteur</button>
+    <div class="draw-banner-buttons">
+        <button id="btnValidateShape" style="display:none;background:#4CAF50;color:white;">
+            <i class="fas fa-check"></i> Valider ce contour
+        </button>
+        <button id="btnCancelShape" style="display:none;background:#f44336;color:white;">
+            <i class="fas fa-rotate-left"></i> Recommencer cette forme
+        </button>
+        <button id="btnFinishZoneDrawing" style="background:white;color:#d32f2f;">
+            <i class="fas fa-flag-checkered"></i> Terminer le secteur
+        </button>
+        <button id="btnCancelZoneDrawing" style="background:rgba(255,255,255,0.25);color:white;">
+            <i class="fas fa-xmark"></i> Annuler le secteur
+        </button>
+    </div>
+    <div class="draw-banner-hint"><i class="fas fa-hand"></i> Astuce : après avoir tracé une forme, vous pouvez glisser chaque point pour l'ajuster avant de valider.</div>
 </div>
 
 <!-- Popup d'attribution des personnes à un secteur -->
@@ -1462,6 +1541,17 @@
     <div class="zp-buttons">
         <button id="btnCancelZonePeople" style="background-color:#777;">Annuler</button>
         <button id="btnSaveZonePeople" style="background-color:#d32f2f;">Enregistrer</button>
+    </div>
+</div>
+
+<!-- Popup de confirmation renforcée pour les actions destructrices -->
+<div id="dangerConfirmPopup" class="zone-people-popup danger-confirm-popup">
+    <h3><i class="fas fa-triangle-exclamation"></i> Confirmation requise</h3>
+    <p id="dangerConfirmText"></p>
+    <input type="text" id="dangerConfirmInput" autocomplete="off" placeholder="Tapez le texte demandé ici">
+    <div class="zp-buttons">
+        <button id="btnDangerCancel" style="background-color:#777;">Annuler</button>
+        <button id="btnDangerConfirm" class="btn-reset">Confirmer</button>
     </div>
 </div>
 
@@ -1579,7 +1669,10 @@ let drawnItemsLayer = null;
 let zoneDrawControl = null;
 let currentDrawingZone = null; // le secteur en cours de dessin (nouveau ou existant)
 let isNewZoneBeingCreated = false;
+let pendingShapeLayer = null; // la forme en cours d'ajustement (points déplaçables) avant validation
 let pendingZonePeopleId = null;
+let dangerConfirmCallback = null;
+let dangerConfirmPhrase = '';
 const ZONE_COLORS = ['#d32f2f', '#1976D2', '#388E3C', '#7B1FA2', '#F57C00', '#00838F', '#5D4037', '#C2185B'];
 
 // ==================================================================
@@ -2332,6 +2425,7 @@ function updateStats() {
     const isAdmin = currentUser.role === 'admin' || currentUser.email === ADMIN_EMAIL;
     document.getElementById('adminSection').style.display = isAdmin ? 'block' : 'none';
     document.getElementById('adminZonesSection').style.display = isAdmin ? 'block' : 'none';
+    document.getElementById('floatingNewZone').style.display = isAdmin ? 'block' : 'none';
     if (isAdmin) {
         renderAdminPanel();
         renderZonesAdminPanel();
@@ -2500,14 +2594,110 @@ function addShapeToZone(zoneId) {
     enterDrawMode();
 }
 
+// Ferme la barre latérale mobile si elle est ouverte (évite qu'elle reste
+// "au-dessus" pendant le dessin et fausse la position des clics sur la carte)
+function closeSidebarForDrawing() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    if (sidebar && sidebar.classList.contains('active')) {
+        sidebar.classList.remove('active');
+        overlay.classList.remove('active');
+    }
+}
+
+function makeZoneDrawControl() {
+    return new L.Draw.Polygon(map, {
+        shapeOptions: { color: currentDrawingZone.color, fillColor: currentDrawingZone.color }
+    });
+}
+
 function enterDrawMode() {
     document.getElementById('drawBannerText').textContent =
         `Secteur "${currentDrawingZone.name}" : cliquez sur la carte pour poser les points du contour d'un quartier, double-cliquez pour fermer la forme.`;
+    document.getElementById('btnValidateShape').style.display = 'none';
+    document.getElementById('btnCancelShape').style.display = 'none';
+    document.getElementById('btnFinishZoneDrawing').style.display = 'inline-flex';
+    document.getElementById('btnCancelZoneDrawing').style.display = 'inline-flex';
     document.getElementById('drawBanner').style.display = 'block';
-    if (!zoneDrawControl) {
-        zoneDrawControl = new L.Draw.Polygon(map, { shapeOptions: { color: '#d32f2f' } });
-    }
+
+    // On ferme la barre latérale et on laisse la carte reprendre sa taille réelle
+    // AVANT d'activer le dessin : sans ce délai, le tout premier point cliqué
+    // pouvait atterrir n'importe où (bug de coordonnées après ouverture du menu / une boîte de dialogue).
+    closeSidebarForDrawing();
+    setTimeout(() => {
+        map.invalidateSize();
+        zoneDrawControl = makeZoneDrawControl();
+        zoneDrawControl.enable();
+    }, 350);
+}
+
+// Appelée quand une forme vient d'être tracée (double-clic) : on la rend
+// éditable pour que l'admin puisse glisser chaque point avant de valider.
+function onZoneShapeCreated(layer) {
+    layer.setStyle({ color: currentDrawingZone.color, fillColor: currentDrawingZone.color, fillOpacity: 0.25 });
+    drawnItemsLayer.addLayer(layer);
+    pendingShapeLayer = layer;
+
+    if (layer.editing) layer.editing.enable();
+
+    document.getElementById('drawBannerText').textContent =
+        `Ajustez les points si besoin en les glissant, puis validez ce contour.`;
+    document.getElementById('btnValidateShape').style.display = 'inline-flex';
+    document.getElementById('btnCancelShape').style.display = 'inline-flex';
+    document.getElementById('btnFinishZoneDrawing').style.display = 'none';
+    document.getElementById('btnCancelZoneDrawing').style.display = 'none';
+}
+
+// Valide la forme en cours (points figés) et l'ajoute au secteur
+function validateShape() {
+    if (!pendingShapeLayer || !currentDrawingZone) return;
+    if (pendingShapeLayer.editing) pendingShapeLayer.editing.disable();
+
+    const latlngs = pendingShapeLayer.getLatLngs()[0].map(p => [p.lat, p.lng]);
+    currentDrawingZone.polygons.push(latlngs);
+    currentDrawingZone.updatedAt = new Date().toISOString();
+    pendingShapeLayer = null;
+
+    document.getElementById('drawBannerText').textContent =
+        `Forme validée (${currentDrawingZone.polygons.length} au total pour "${currentDrawingZone.name}"). Dessinez un autre quartier si besoin, ou terminez le secteur.`;
+    document.getElementById('btnValidateShape').style.display = 'none';
+    document.getElementById('btnCancelShape').style.display = 'none';
+    document.getElementById('btnFinishZoneDrawing').style.display = 'inline-flex';
+    document.getElementById('btnCancelZoneDrawing').style.display = 'inline-flex';
+
+    // Prêt à tracer un autre quartier tout de suite si l'admin reclique sur la carte
+    zoneDrawControl = makeZoneDrawControl();
     zoneDrawControl.enable();
+}
+
+// Annule uniquement la forme en cours d'ajustement, sans annuler tout le secteur
+function cancelShape() {
+    if (pendingShapeLayer) {
+        drawnItemsLayer.removeLayer(pendingShapeLayer);
+        pendingShapeLayer = null;
+    }
+    document.getElementById('btnValidateShape').style.display = 'none';
+    document.getElementById('btnCancelShape').style.display = 'none';
+    document.getElementById('btnFinishZoneDrawing').style.display = 'inline-flex';
+    document.getElementById('btnCancelZoneDrawing').style.display = 'inline-flex';
+    document.getElementById('drawBannerText').textContent =
+        `Secteur "${currentDrawingZone.name}" : cliquez sur la carte pour poser les points du contour, double-cliquez pour fermer la forme.`;
+
+    zoneDrawControl = makeZoneDrawControl();
+    zoneDrawControl.enable();
+}
+
+// Annule complètement la création/modification du secteur en cours
+function cancelZoneDrawing() {
+    if (zoneDrawControl) zoneDrawControl.disable();
+    if (pendingShapeLayer) {
+        drawnItemsLayer.removeLayer(pendingShapeLayer);
+        pendingShapeLayer = null;
+    }
+    drawnItemsLayer.clearLayers();
+    document.getElementById('drawBanner').style.display = 'none';
+    currentDrawingZone = null;
+    isNewZoneBeingCreated = false;
 }
 
 function finishZoneDrawing() {
@@ -2517,8 +2707,10 @@ function finishZoneDrawing() {
     if (!currentDrawingZone) return;
 
     if (currentDrawingZone.polygons.length === 0) {
-        if (isNewZoneBeingCreated) alert("Aucune forme dessinée : secteur annulé.");
+        if (isNewZoneBeingCreated) alert("Aucune forme validée : secteur annulé.");
+        drawnItemsLayer.clearLayers();
         currentDrawingZone = null;
+        isNewZoneBeingCreated = false;
         return;
     }
 
@@ -2533,6 +2725,7 @@ function finishZoneDrawing() {
     currentDrawingZone = null;
     isNewZoneBeingCreated = false;
 
+    drawnItemsLayer.clearLayers();
     renderZonesOnMap();
     renderZonesAdminPanel();
 
@@ -2865,19 +3058,11 @@ function initMap() {
     drawnItemsLayer = L.layerGroup().addTo(map);
     renderZonesOnMap();
 
-    // Écoute la fin du dessin d'une forme de secteur (voir startNewZone / addShapeToZone)
+    // Écoute la fin du tracé d'une forme de secteur (voir startNewZone / addShapeToZone) :
+    // la forme devient éditable (points déplaçables) avant validation, voir onZoneShapeCreated.
     map.on(L.Draw.Event.CREATED, function(e) {
         if (!currentDrawingZone) return;
-        const layer = e.layer;
-        const latlngs = layer.getLatLngs()[0].map(p => [p.lat, p.lng]);
-        currentDrawingZone.polygons.push(latlngs);
-        currentDrawingZone.updatedAt = new Date().toISOString();
-
-        if (confirm(`Forme ajoutée à "${currentDrawingZone.name}".\n\nVoulez-vous dessiner un autre quartier pour ce même secteur ?`)) {
-            zoneDrawControl.enable();
-        } else {
-            finishZoneDrawing();
-        }
+        onZoneShapeCreated(e.layer);
     });
     
     // Redimensionner la carte
@@ -3205,40 +3390,75 @@ function isCurrentUserAdmin() {
     return !!currentUser && (currentUser.role === 'admin' || currentUser.email === ADMIN_EMAIL);
 }
 
+// ==================================================================
+// CONFIRMATION RENFORCÉE (actions destructrices) : il faut taper une
+// phrase exacte pour valider, afin d'éviter une suppression par erreur.
+// ==================================================================
+function askDangerConfirmation(message, phrase, callback) {
+    dangerConfirmPhrase = phrase;
+    dangerConfirmCallback = callback;
+    document.getElementById('dangerConfirmText').innerHTML =
+        `${message}<br><br>Pour confirmer, tapez exactement : <strong>${phrase}</strong>`;
+    document.getElementById('dangerConfirmInput').value = '';
+    document.getElementById('dangerConfirmPopup').style.display = 'block';
+    setTimeout(() => document.getElementById('dangerConfirmInput').focus(), 50);
+}
+
+function hideDangerConfirmation() {
+    document.getElementById('dangerConfirmPopup').style.display = 'none';
+    dangerConfirmCallback = null;
+    dangerConfirmPhrase = '';
+}
+
+function confirmDangerAction() {
+    const typed = document.getElementById('dangerConfirmInput').value.trim();
+    if (typed !== dangerConfirmPhrase) {
+        alert("Le texte tapé ne correspond pas exactement. Rien n'a été supprimé.");
+        return;
+    }
+    const callback = dangerConfirmCallback;
+    hideDangerConfirmation();
+    if (callback) callback();
+}
+
 // FONCTION RESET TOTAL (admin seulement) : supprime utilisateurs + maisons
 function resetData() {
     if (!isCurrentUserAdmin()) {
         alert("Accès refusé. Cette fonction est réservée à l'administrateur.");
         return;
     }
-    if (confirm("Êtes-vous sûr de vouloir réinitialiser TOUTES les données (utilisateurs + maisons + secteurs) ? Cette action est irréversible.")) {
-        localStorage.removeItem('calentour_houses');
-        localStorage.removeItem('calentour_users');
-        localStorage.removeItem('calentour_zones');
-        localStorage.removeItem('calentour_remember');
+    askDangerConfirmation(
+        "Ceci va supprimer <strong>définitivement</strong> tous les utilisateurs, toutes les maisons et tous les secteurs. Cette action est irréversible.",
+        "SUPPRIMER TOUT",
+        () => {
+            localStorage.removeItem('calentour_houses');
+            localStorage.removeItem('calentour_users');
+            localStorage.removeItem('calentour_zones');
+            localStorage.removeItem('calentour_remember');
 
-        if (firebaseReady) {
-            db.ref('houses').remove().catch(e => console.error(e));
-            db.ref('users').remove().catch(e => console.error(e));
-            db.ref('zones').remove().catch(e => console.error(e));
+            if (firebaseReady) {
+                db.ref('houses').remove().catch(e => console.error(e));
+                db.ref('users').remove().catch(e => console.error(e));
+                db.ref('zones').remove().catch(e => console.error(e));
+            }
+
+            houses = [];
+            users = [];
+            zones = [];
+            currentUser = null;
+
+            // Supprimer tous les marqueurs
+            markers.forEach(marker => {
+                map.removeLayer(marker);
+            });
+            markers.clear();
+
+            // Retour à l'écran de connexion
+            logout();
+
+            alert("Toutes les données ont été réinitialisées.");
         }
-        
-        houses = [];
-        users = [];
-        zones = [];
-        currentUser = null;
-        
-        // Supprimer tous les marqueurs
-        markers.forEach(marker => {
-            map.removeLayer(marker);
-        });
-        markers.clear();
-        
-        // Retour à l'écran de connexion
-        logout();
-        
-        alert("Toutes les données ont été réinitialisées.");
-    }
+    );
 }
 
 // FONCTION NOUVELLE SAISON (admin seulement) : remet tous les points en gris
@@ -3248,25 +3468,27 @@ function resetSeason() {
         alert("Accès refusé. Cette fonction est réservée à l'administrateur.");
         return;
     }
-    if (!confirm("Démarrer une nouvelle saison ?\n\nTous les points repasseront en GRIS (non passé). Les adresses et positions sont conservées, mais les statuts, notes, paiements et achats seront effacés. Cette action est irréversible.")) {
-        return;
-    }
+    askDangerConfirmation(
+        "Ceci va remettre <strong>tous les points en gris</strong> (non passé). Les adresses et positions sont conservées, mais les statuts, notes, paiements et achats seront effacés. Cette action est irréversible.",
+        "NOUVELLE SAISON",
+        () => {
+            houses.forEach(house => {
+                house.status = STATUS.NOT_PASSED;
+                house.note = '';
+                delete house.payment;
+                house.purchases = [];
+                house.updatedAt = new Date().toISOString();
+                updateMarker(house);
+                syncHouseRemote(house);
+            });
 
-    houses.forEach(house => {
-        house.status = STATUS.NOT_PASSED;
-        house.note = '';
-        delete house.payment;
-        house.purchases = [];
-        house.updatedAt = new Date().toISOString();
-        updateMarker(house);
-        syncHouseRemote(house);
-    });
+            saveHouses();
+            updateStats();
+            updateRanking();
 
-    saveHouses();
-    updateStats();
-    updateRanking();
-
-    alert("Nouvelle saison lancée : tous les points sont repassés en gris.");
+            alert("Nouvelle saison lancée : tous les points sont repassés en gris.");
+        }
+    );
 }
 
 // FONCTION POUR AJOUTER UNE MAISON : place directement le point à la position GPS actuelle
@@ -3411,9 +3633,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Gestion des secteurs (admin)
     document.getElementById('btnNewZone').addEventListener('click', startNewZone);
+    document.getElementById('btnFloatingNewZone').addEventListener('click', startNewZone);
+    document.getElementById('btnValidateShape').addEventListener('click', validateShape);
+    document.getElementById('btnCancelShape').addEventListener('click', cancelShape);
     document.getElementById('btnFinishZoneDrawing').addEventListener('click', finishZoneDrawing);
+    document.getElementById('btnCancelZoneDrawing').addEventListener('click', cancelZoneDrawing);
     document.getElementById('btnCancelZonePeople').addEventListener('click', hideZonePeoplePopup);
     document.getElementById('btnSaveZonePeople').addEventListener('click', saveZonePeople);
+
+    // Confirmation renforcée (actions destructrices)
+    document.getElementById('btnDangerCancel').addEventListener('click', hideDangerConfirmation);
+    document.getElementById('btnDangerConfirm').addEventListener('click', confirmDangerAction);
+    document.getElementById('dangerConfirmInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') confirmDangerAction();
+    });
     
     // Gestion de la barre latérale mobile
     document.getElementById('menuToggle').addEventListener('click', toggleSidebar);
